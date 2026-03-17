@@ -136,6 +136,12 @@ export enum TipoVenta {
   EN_NEGRO = 'EN_NEGRO',
 }
 
+export enum MetodoPago {
+  EFECTIVO = 'EFECTIVO',
+  TRANSFERENCIA = 'TRANSFERENCIA',
+  CUENTA_CORRIENTE = 'CUENTA_CORRIENTE',
+}
+
 export enum EstadoRemito {
   BORRADOR = 'BORRADOR',
   CONFIRMADO = 'CONFIRMADO',
@@ -155,6 +161,13 @@ export enum TipoMovimientoStock {
   AJUSTE = 'AJUSTE',
 }
 
+export interface VentaPago {
+  id: string;
+  ventaId: string;
+  metodoPago: MetodoPago;
+  monto: number;
+}
+
 export interface Venta {
   id: string;
   numero: number;
@@ -171,6 +184,9 @@ export interface Venta {
   totalDescuento: number;
   total: number;
   estado: EstadoVenta;
+  pagos: VentaPago[];
+  diasCredito?: number;
+  fechaVencimiento?: string;
   observaciones?: string;
   createdAt: string;
   updatedAt: string;
@@ -231,6 +247,7 @@ export interface MovimientoCuentaCorriente {
   monto: number;
   saldo: number;
   descripcion: string;
+  metodoPago?: MetodoPago;
   referenciaId?: string;
   referenciaTipo?: string;
   createdAt: string;

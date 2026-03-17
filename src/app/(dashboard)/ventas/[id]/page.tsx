@@ -5,11 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import { get, post, del } from "@/lib/api-client";
 import {
   Venta,
-  VentaItem,
   EstadoVenta,
   Producto,
   PaginatedResponse,
-  ListaPrecio,
   Role,
 } from "@/types";
 import {
@@ -17,8 +15,8 @@ import {
   formatListaPrecio,
   formatEstadoVenta,
   estadoVentaVariant,
+  formatMetodoPago,
 } from "@/lib/formatters";
-import { calcularLineaVenta } from "@/lib/iva-calculator";
 import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -398,6 +396,33 @@ export default function VentaDetailPage() {
               <p className="text-sm text-muted-foreground">Discrimina IVA</p>
               <p className="font-medium">{venta.conIva ? "Sí" : "No"}</p>
             </div>
+            <div className="md:col-span-2">
+              <p className="text-sm text-muted-foreground">Métodos de Pago</p>
+              <div className="mt-1 space-y-1">
+                {venta.pagos.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 text-sm font-medium">
+                    <span>{formatMetodoPago(p.metodoPago)}</span>
+                    {p.monto > 0 && (
+                      <span className="text-muted-foreground">— {formatCurrency(p.monto)}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {venta.diasCredito && (
+              <div>
+                <p className="text-sm text-muted-foreground">Días de Crédito</p>
+                <p className="font-medium">{venta.diasCredito} días</p>
+              </div>
+            )}
+            {venta.fechaVencimiento && (
+              <div>
+                <p className="text-sm text-muted-foreground">Vencimiento</p>
+                <p className="font-medium">
+                  {new Date(venta.fechaVencimiento).toLocaleDateString("es-AR")}
+                </p>
+              </div>
+            )}
             {venta.descuentoTotal > 0 && (
               <div>
                 <p className="text-sm text-muted-foreground">Descuento General</p>

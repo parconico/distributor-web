@@ -4,8 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { get, post } from "@/lib/api-client";
-import { Cliente, MovimientoCuentaCorriente, TipoMovimientoCuenta } from "@/types";
-import { formatCurrency, formatTipoMovimientoCuenta } from "@/lib/formatters";
+import { Cliente, MetodoPago, MovimientoCuentaCorriente, PaginatedResponse, TipoMovimientoCuenta } from "@/types";
+import { formatCurrency, formatMetodoPago, formatTipoMovimientoCuenta } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/tables/data-table";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { AxiosError } from "axios";
 
@@ -38,6 +45,7 @@ export default function CuentaCorrienteDetailPage() {
   // Pago dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pagoMonto, setPagoMonto] = useState<number>(0);
+  const [pagoMetodoPago, setPagoMetodoPago] = useState<MetodoPago>(MetodoPago.EFECTIVO);
   const [pagoDescripcion, setPagoDescripcion] = useState("Pago recibido");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -45,11 +53,11 @@ export default function CuentaCorrienteDetailPage() {
     try {
       const [clienteData, movimientosData, saldoData] = await Promise.all([
         get<Cliente>(`/clientes/${clienteId}`),
-        get<MovimientoCuentaCorriente[]>(`/cuentas-corrientes/${clienteId}`),
+        get<PaginatedResponse<MovimientoCuentaCorriente>>(`/cuentas-corrientes/${clienteId}?limit=1000`),
         get<{ saldo: number }>(`/cuentas-corrientes/${clienteId}/saldo`),
       ]);
       setCliente(clienteData);
-      setMovimientos(movimientosData);
+      setMovimientos(movimientosData.data);
       setSaldo(saldoData.saldo);
     } catch {
       toast({
@@ -81,11 +89,13 @@ export default function CuentaCorrienteDetailPage() {
       await post("/cuentas-corrientes/pago", {
         clienteId,
         monto: pagoMonto,
+        metodoPago: pagoMetodoPago,
         descripcion: pagoDescripcion || "Pago recibido",
       });
       toast({ title: "Pago registrado correctamente" });
       setDialogOpen(false);
       setPagoMonto(0);
+      setPagoMetodoPago(MetodoPago.EFECTIVO);
       setPagoDescripcion("Pago recibido");
       await fetchData();
     } catch (error) {
@@ -136,6 +146,14 @@ export default function CuentaCorrienteDetailPage() {
       accessorKey: "saldo",
       header: "Saldo",
       cell: ({ row }) => formatCurrency(row.original.saldo),
+    },
+    {
+      accessorKey: "metodoPago",
+      header: "Método de Pago",
+      cell: ({ row }) => {
+        const metodo = row.original.metodoPago;
+        return metodo ? formatMetodoPago(metodo) : "—";
+      },
     },
     {
       accessorKey: "descripcion",
@@ -189,6 +207,21 @@ export default function CuentaCorrienteDetailPage() {
                     onChange={(e) => setPagoMonto(Number(e.target.value))}
                     placeholder="0.00"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="metodoPago">Método de Pago</Label>
+                  <Select
+                    value={pagoMetodoPago}
+                    onValueChange={(value) => setPagoMetodoPago(value as MetodoPago)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
+                      <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="descripcion">Descripción (opcional)</Label>

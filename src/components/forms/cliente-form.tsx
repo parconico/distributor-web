@@ -43,18 +43,7 @@ const clienteSchema = z
       .number({ invalid_type_error: "Debe ser un número" })
       .min(0, "El límite de crédito no puede ser negativo"),
   })
-  .refine(
-    (data) => {
-      if (data.tipoDocumento === "CUIT") {
-        return validateCuit(data.numeroDocumento.replace(/\D/g, ""));
-      }
-      return true;
-    },
-    {
-      message: "El CUIT es inválido",
-      path: ["numeroDocumento"],
-    }
-  );
+;
 
 type ClienteFormData = z.infer<typeof clienteSchema>;
 

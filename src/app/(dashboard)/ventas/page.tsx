@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { get, del } from "@/lib/api-client";
 import { Venta, PaginatedResponse, EstadoVenta, Role } from "@/types";
-import { formatCurrency, formatListaPrecio, formatEstadoVenta, estadoVentaVariant } from "@/lib/formatters";
+import { formatCurrency, formatListaPrecio, formatEstadoVenta, estadoVentaVariant, formatMetodoPago } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/tables/data-table";
 import { RoleGate } from "@/components/shared/role-gate";
@@ -123,11 +123,20 @@ export default function VentasPage() {
     {
       accessorKey: "estado",
       header: "Estado",
-      cell: ({ row }) => (
-        <Badge variant={estadoVentaVariant(row.original.estado)}>
-          {formatEstadoVenta(row.original.estado)}
-        </Badge>
-      ),
+      cell: ({ row }) => {
+        const v = row.original;
+        if (v.estado === EstadoVenta.BORRADOR) {
+          return <Badge variant="outline">Borrador</Badge>;
+        }
+        if (v.estado === EstadoVenta.ANULADA) {
+          return <Badge variant="destructive">Anulada</Badge>;
+        }
+        return (
+          <Badge variant={estadoVentaVariant(v.estado)}>
+            {v.pagos.map(p => formatMetodoPago(p.metodoPago)).join(" + ")}
+          </Badge>
+        );
+      },
     },
     {
       id: "acciones",
@@ -143,7 +152,7 @@ export default function VentasPage() {
             >
               <Eye className="h-4 w-4" />
             </Button>
-            {venta.estado === "BORRADOR" && (
+            {venta.estado !== EstadoVenta.FACTURADA && (
               <RoleGate allowedRoles={[Role.ADMIN]}>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

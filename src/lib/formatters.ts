@@ -1,4 +1,4 @@
-import { CondicionIva, EstadoVenta, EstadoRemito, EstadoCompra, ListaPrecio, TipoComprobante, TipoMovimientoCuenta, TipoMovimientoStock } from "@/types";
+import { CondicionIva, EstadoVenta, EstadoRemito, EstadoCompra, ListaPrecio, MetodoPago, TipoComprobante, TipoMovimientoCuenta, TipoMovimientoStock } from "@/types";
 
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-AR", {
@@ -74,6 +74,15 @@ export function formatTipoComprobante(tipo: TipoComprobante): string {
     [TipoComprobante.NOTA_DEBITO_C]: "Nota de Débito C",
   };
   return labels[tipo] ?? tipo;
+}
+
+export function formatMetodoPago(metodo: MetodoPago): string {
+  const labels: Record<MetodoPago, string> = {
+    [MetodoPago.EFECTIVO]: "Efectivo",
+    [MetodoPago.TRANSFERENCIA]: "Transferencia",
+    [MetodoPago.CUENTA_CORRIENTE]: "Cuenta Corriente",
+  };
+  return labels[metodo] ?? metodo;
 }
 
 export function formatPuntoVentaNumero(pv: number, num: number): string {

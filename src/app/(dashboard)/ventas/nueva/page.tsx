@@ -3,8 +3,8 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api-client";
-import { Cliente, Producto, PaginatedResponse, ListaPrecio } from "@/types";
-import { formatCurrency, formatListaPrecio } from "@/lib/formatters";
+import { Cliente, MetodoPago, Producto, PaginatedResponse, ListaPrecio } from "@/types";
+import { formatCurrency, formatListaPrecio, formatMetodoPago } from "@/lib/formatters";
 import { calcularLineaVenta } from "@/lib/iva-calculator";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,10 @@ export default function NuevaVentaPage() {
   const [tipoVenta, setTipoVenta] = useState<"EN_BLANCO" | "EN_NEGRO">("EN_BLANCO");
   const [conIva, setConIva] = useState(true);
   const [descuentoGeneral, setDescuentoGeneral] = useState(0);
+  const [pagos, setPagos] = useState<{ metodoPago: MetodoPago; monto: number }[]>([
+    { metodoPago: MetodoPago.CUENTA_CORRIENTE, monto: 0 },
+  ]);
+  const [diasCredito, setDiasCredito] = useState(30);
   const [observaciones, setObservaciones] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -211,6 +215,8 @@ export default function NuevaVentaPage() {
         tipoVenta,
         conIva,
         descuentoTotal: descuentoGeneral,
+        pagos,
+        diasCredito: pagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) ? diasCredito : undefined,
         observaciones: observaciones || undefined,
       });
 
@@ -255,7 +261,7 @@ export default function NuevaVentaPage() {
           <CardTitle>Datos de la venta</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
             <div className="space-y-2">
               <Label>Cliente *</Label>
               <Select value={clienteId} onValueChange={handleClienteChange}>
@@ -331,6 +337,65 @@ export default function NuevaVentaPage() {
                 onChange={(e) => setDescuentoGeneral(Number(e.target.value))}
               />
             </div>
+
+            <div className="space-y-3 lg:col-span-3">
+              <Label>Método de Pago</Label>
+              <div className="space-y-2">
+                {Object.values(MetodoPago).map((mp) => {
+                  const pago = pagos.find(p => p.metodoPago === mp);
+                  const checked = !!pago;
+                  return (
+                    <div key={mp} className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer w-44">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300"
+                          checked={checked}
+                          onChange={(e) =>
+                            setPagos(prev =>
+                              e.target.checked
+                                ? [...prev, { metodoPago: mp, monto: 0 }]
+                                : prev.filter(p => p.metodoPago !== mp)
+                            )
+                          }
+                        />
+                        <span className="text-sm">{formatMetodoPago(mp)}</span>
+                      </label>
+                      {checked && (
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          placeholder="Monto"
+                          className="w-36"
+                          value={pago.monto || ""}
+                          onChange={(e) =>
+                            setPagos(prev =>
+                              prev.map(p =>
+                                p.metodoPago === mp ? { ...p, monto: Number(e.target.value) } : p
+                              )
+                            )
+                          }
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {pagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) && (
+              <div className="space-y-2">
+                <Label>Días de crédito</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="365"
+                  value={diasCredito}
+                  onChange={(e) => setDiasCredito(Number(e.target.value))}
+                />
+              </div>
+            )}
           </div>
 
           {tipoVenta === "EN_NEGRO" && (
