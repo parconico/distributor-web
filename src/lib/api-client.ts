@@ -1,11 +1,18 @@
 import axios, { AxiosRequestConfig, AxiosError } from "axios";
 
+const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
+  baseURL,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
+});
+
+const refreshClient = axios.create({
+  baseURL,
+  withCredentials: true,
 });
 
 let isRefreshing = false;
@@ -45,14 +52,11 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        await apiClient.post("/auth/refresh");
+        await refreshClient.post("/auth/refresh");
         processQueue(null);
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
