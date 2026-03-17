@@ -28,8 +28,8 @@ import { AxiosError } from "axios";
 const clienteSchema = z
   .object({
     razonSocial: z.string().min(1, "La razón social es obligatoria"),
-    tipoDocumento: z.string().min(1, "El tipo de documento es obligatorio"),
-    numeroDocumento: z.string().min(1, "El número de documento es obligatorio"),
+    tipoDocumento: z.string().optional().default("CUIT"),
+    numeroDocumento: z.string().optional().default(""),
     condicionIva: z.nativeEnum(CondicionIva, {
       required_error: "La condición de IVA es obligatoria",
     }),
@@ -227,7 +227,7 @@ export function ClienteForm({ cliente, prefill }: ClienteFormProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="tipoDocumento">Tipo de Documento *</Label>
+              <Label htmlFor="tipoDocumento">Tipo de Documento</Label>
               <Select
                 value={tipoDocumento}
                 onValueChange={(val) =>
@@ -251,7 +251,7 @@ export function ClienteForm({ cliente, prefill }: ClienteFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="numeroDocumento">Número de Documento *</Label>
+              <Label htmlFor="numeroDocumento">Número de Documento</Label>
               <div className="flex gap-2">
                 <div className="flex-1">
                   {tipoDocumento === "CUIT" || tipoDocumento === "CUIL" ? (
