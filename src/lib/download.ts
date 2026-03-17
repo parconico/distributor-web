@@ -1,5 +1,6 @@
 export async function downloadFile(url: string, filename: string) {
-  const response = await fetch(`http://localhost:3001${url}`, {
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+  const response = await fetch(`${baseUrl}${url}`, {
     credentials: 'include',
   });
   const blob = await response.blob();
