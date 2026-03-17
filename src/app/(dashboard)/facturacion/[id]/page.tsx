@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Loader2, Download } from "lucide-react";
+import apiClient from "@/lib/api-client";
 
 const alicuotaLabels: Record<number, string> = {
   3: "0%",
@@ -97,9 +98,22 @@ export default function ComprobanteDetailPage() {
           </h1>
           {resultadoBadge()}
         </div>
-        <Button variant="outline" onClick={() => router.push("/facturacion")}>
-          Volver
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const res = await apiClient.get(`/arca/comprobantes/${params.id}/pdf`, { responseType: 'blob' });
+              const url = URL.createObjectURL(res.data as Blob);
+              window.open(url);
+            }}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Descargar PDF
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/facturacion")}>
+            Volver
+          </Button>
+        </div>
       </div>
 
       {/* Detalle del comprobante */}

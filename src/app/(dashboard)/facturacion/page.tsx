@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { get } from "@/lib/api-client";
-import { Comprobante, Role } from "@/types";
+import { Comprobante, PaginatedResponse, Role } from "@/types";
 import {
   formatCurrency,
   formatTipoComprobante,
@@ -15,7 +15,7 @@ import { DataTable } from "@/components/tables/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RoleGate } from "@/components/shared/role-gate";
-import { Loader2, Settings } from "lucide-react";
+import { Eye, Loader2, Settings } from "lucide-react";
 
 export default function FacturacionPage() {
   const router = useRouter();
@@ -24,8 +24,8 @@ export default function FacturacionPage() {
 
   const fetchComprobantes = async () => {
     try {
-      const response = await get<Comprobante[]>("/arca/comprobantes");
-      setComprobantes(response);
+      const response = await get<PaginatedResponse<Comprobante>>("/arca/comprobantes?page=1&limit=100");
+      setComprobantes(response.data);
     } catch {
       toast({
         title: "Error",
@@ -91,6 +91,19 @@ export default function FacturacionPage() {
         }
         return <Badge variant="outline">{resultado ?? "-"}</Badge>;
       },
+    },
+    {
+      id: "acciones",
+      header: "Acciones",
+      cell: ({ row }) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push(`/facturacion/${row.original.id}`)}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
+      ),
     },
   ];
 

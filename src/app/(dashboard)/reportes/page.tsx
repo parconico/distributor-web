@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ShoppingCart, FileText, Package } from "lucide-react";
+import { ShoppingCart, FileText, Package, TrendingUp, BarChart3 } from "lucide-react";
 
 const reportes = [
   {
@@ -28,6 +28,18 @@ const reportes = [
     description: "Inventario actual valorizado a precios de Lista 1.",
     href: "/reportes/stock-valorizado",
     icon: Package,
+  },
+  {
+    title: "Productos Más Vendidos",
+    description: "Ranking de productos por cantidad vendida y monto en el período.",
+    href: "/reportes/productos-mas-vendidos",
+    icon: TrendingUp,
+  },
+  {
+    title: "Compras vs Ventas",
+    description: "Comparativa de ventas y compras con margen bruto y porcentaje.",
+    href: "/reportes/compras-vs-ventas",
+    icon: BarChart3,
   },
 ];
 

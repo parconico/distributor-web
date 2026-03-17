@@ -13,6 +13,7 @@ import {
   Warehouse,
   BookOpen,
   FileText,
+  ClipboardList,
   BarChart3,
   UserCog,
   ChevronLeft,
@@ -45,6 +46,12 @@ const navItems: NavItem[] = [
     allowedRoles: [Role.ADMIN, Role.DEPOSITO, Role.CONTADOR],
   },
   {
+    label: "Compras",
+    href: "/compras",
+    icon: ShoppingCart,
+    allowedRoles: [Role.ADMIN, Role.DEPOSITO, Role.CONTADOR],
+  },
+  {
     label: "Clientes",
     href: "/clientes",
     icon: Users,
@@ -67,6 +74,12 @@ const navItems: NavItem[] = [
     href: "/ventas",
     icon: ShoppingCart,
     allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.CONTADOR],
+  },
+  {
+    label: "Remitos",
+    href: "/remitos",
+    icon: ClipboardList,
+    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.DEPOSITO, Role.CONTADOR],
   },
   {
     label: "Stock",

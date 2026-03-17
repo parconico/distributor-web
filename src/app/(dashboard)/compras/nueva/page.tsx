@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api-client";
-import { Cliente, Producto, PaginatedResponse, ListaPrecio } from "@/types";
-import { formatCurrency, formatListaPrecio } from "@/lib/formatters";
+import { Proveedor, Producto, PaginatedResponse } from "@/types";
+import { formatCurrency } from "@/lib/formatters";
 import { calcularLineaVenta } from "@/lib/iva-calculator";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -27,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
 
@@ -36,42 +35,38 @@ interface LocalItem {
   producto: Producto;
   cantidad: number;
   precioUnitario: number;
-  descuento: number;
   alicuotaIva: number;
   subtotal: number;
   montoIva: number;
   total: number;
 }
 
-export default function NuevaVentaPage() {
+export default function NuevaCompraPage() {
   const router = useRouter();
 
-  const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [clienteId, setClienteId] = useState("");
-  const [listaPrecio, setListaPrecio] = useState<ListaPrecio | "">("");
-  const [tipoVenta, setTipoVenta] = useState<"EN_BLANCO" | "EN_NEGRO">("EN_BLANCO");
-  const [conIva, setConIva] = useState(true);
-  const [descuentoGeneral, setDescuentoGeneral] = useState(0);
+  const [proveedorId, setProveedorId] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
+  const [precioUnitario, setPrecioUnitario] = useState(0);
 
   const [items, setItems] = useState<LocalItem[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [clientesRes, productosRes] = await Promise.all([
-          get<PaginatedResponse<Cliente>>("/clientes?page=1&limit=100"),
+        const [proveedoresRes, productosRes] = await Promise.all([
+          get<PaginatedResponse<Proveedor>>("/proveedores?page=1&limit=100"),
           get<PaginatedResponse<Producto>>("/productos?page=1&limit=100"),
         ]);
-        setClientes(clientesRes.data);
+        setProveedores(proveedoresRes.data);
         setProductos(productosRes.data);
       } catch {
         toast({
@@ -85,17 +80,6 @@ export default function NuevaVentaPage() {
     };
     fetchData();
   }, []);
-
-  const handleClienteChange = useCallback(
-    (id: string) => {
-      setClienteId(id);
-      const cliente = clientes.find((c) => c.id === id);
-      if (cliente) {
-        setListaPrecio(cliente.listaPrecio);
-      }
-    },
-    [clientes]
-  );
 
   const filteredProductos = useMemo(() => {
     if (!searchTerm) return productos;
@@ -112,32 +96,48 @@ export default function NuevaVentaPage() {
     [productos, selectedProductoId]
   );
 
-  const getPrecioForLista = useCallback(
-    (producto: Producto): number => {
-      if (!listaPrecio) return 0;
-      const precio = producto.precios?.find(
-        (p) => p.listaPrecio === listaPrecio
-      );
-      return precio?.precioNeto ?? 0;
-    },
-    [listaPrecio]
-  );
+  useEffect(() => {
+    if (selectedProducto) {
+      setPrecioUnitario(0);
+    }
+  }, [selectedProductoId]);
 
   const handleAddItem = () => {
-    if (!selectedProducto || !listaPrecio) return;
+    if (!selectedProducto) return;
     if (cantidad <= 0) {
-      toast({ title: "Error", description: "La cantidad debe ser mayor a 0", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "La cantidad debe ser mayor a 0",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (precioUnitario < 0) {
+      toast({
+        title: "Error",
+        description: "El precio debe ser mayor o igual a 0",
+        variant: "destructive",
+      });
       return;
     }
 
     const existing = items.find((i) => i.productoId === selectedProducto.id);
     if (existing) {
-      toast({ title: "Producto ya agregado", description: "Modifique la cantidad en la tabla", variant: "destructive" });
+      toast({
+        title: "Producto ya agregado",
+        description: "Modifique la cantidad o precio en la tabla",
+        variant: "destructive",
+      });
       return;
     }
 
-    const precioUnitario = getPrecioForLista(selectedProducto);
-    const linea = calcularLineaVenta(precioUnitario, cantidad, selectedProducto.alicuotaIva, conIva, 0);
+    const linea = calcularLineaVenta(
+      precioUnitario,
+      cantidad,
+      selectedProducto.alicuotaIva,
+      true,
+      0
+    );
 
     setItems((prev) => [
       ...prev,
@@ -146,7 +146,6 @@ export default function NuevaVentaPage() {
         producto: selectedProducto,
         cantidad,
         precioUnitario,
-        descuento: 0,
         alicuotaIva: selectedProducto.alicuotaIva,
         ...linea,
       },
@@ -155,80 +154,103 @@ export default function NuevaVentaPage() {
     setSelectedProductoId("");
     setSearchTerm("");
     setCantidad(1);
+    setPrecioUnitario(0);
   };
 
   const handleRemoveItem = (productoId: string) => {
     setItems((prev) => prev.filter((i) => i.productoId !== productoId));
   };
 
-  const recalcItem = (item: LocalItem, newCantidad: number, newDescuento: number): LocalItem => {
-    const linea = calcularLineaVenta(item.precioUnitario, newCantidad, item.alicuotaIva, conIva, newDescuento);
-    return { ...item, cantidad: newCantidad, descuento: newDescuento, ...linea };
+  const recalcItem = (
+    item: LocalItem,
+    newCantidad: number,
+    newPrecio: number
+  ): LocalItem => {
+    const linea = calcularLineaVenta(
+      newPrecio,
+      newCantidad,
+      item.alicuotaIva,
+      true,
+      0
+    );
+    return { ...item, cantidad: newCantidad, precioUnitario: newPrecio, ...linea };
   };
 
   const handleUpdateCantidad = (productoId: string, newCantidad: number) => {
     if (newCantidad <= 0) return;
-    setItems((prev) => prev.map((item) => item.productoId !== productoId ? item : recalcItem(item, newCantidad, item.descuento)));
+    setItems((prev) =>
+      prev.map((item) =>
+        item.productoId !== productoId
+          ? item
+          : recalcItem(item, newCantidad, item.precioUnitario)
+      )
+    );
   };
 
-  const handleUpdateDescuento = (productoId: string, newDescuento: number) => {
-    if (newDescuento < 0 || newDescuento > 100) return;
-    setItems((prev) => prev.map((item) => item.productoId !== productoId ? item : recalcItem(item, item.cantidad, newDescuento)));
+  const handleUpdatePrecio = (productoId: string, newPrecio: number) => {
+    if (newPrecio < 0) return;
+    setItems((prev) =>
+      prev.map((item) =>
+        item.productoId !== productoId
+          ? item
+          : recalcItem(item, item.cantidad, newPrecio)
+      )
+    );
   };
 
   const totals = useMemo(() => {
-    const subtotalItems = items.reduce((acc, i) => acc + i.subtotal, 0);
-    const totalIvaItems = items.reduce((acc, i) => acc + i.montoIva, 0);
-    const totalItems = items.reduce((acc, i) => acc + i.total, 0);
-    const factor = 1 - descuentoGeneral / 100;
+    const subtotal = items.reduce((acc, i) => acc + i.subtotal, 0);
+    const totalIva = items.reduce((acc, i) => acc + i.montoIva, 0);
+    const total = items.reduce((acc, i) => acc + i.total, 0);
     return {
-      subtotal: Math.round(subtotalItems * factor * 100) / 100,
-      totalIva: Math.round(totalIvaItems * factor * 100) / 100,
-      totalDescuento: Math.round((totalItems - totalItems * factor) * 100) / 100,
-      total: Math.round(totalItems * factor * 100) / 100,
+      subtotal: Math.round(subtotal * 100) / 100,
+      totalIva: Math.round(totalIva * 100) / 100,
+      total: Math.round(total * 100) / 100,
     };
-  }, [items, descuentoGeneral]);
+  }, [items]);
 
   const handleSave = async () => {
-    if (!clienteId) {
-      toast({ title: "Error", description: "Debe seleccionar un cliente", variant: "destructive" });
-      return;
-    }
-    if (!listaPrecio) {
-      toast({ title: "Error", description: "Debe seleccionar una lista de precio", variant: "destructive" });
+    if (!proveedorId) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un proveedor",
+        variant: "destructive",
+      });
       return;
     }
     if (items.length === 0) {
-      toast({ title: "Error", description: "Debe agregar al menos un producto", variant: "destructive" });
+      toast({
+        title: "Error",
+        description: "Debe agregar al menos un producto",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsSaving(true);
     try {
-      const venta = await post<{ id: string }>("/ventas", {
-        clienteId,
-        listaPrecio,
-        tipoVenta,
-        conIva,
-        descuentoTotal: descuentoGeneral,
+      const compra = await post<{ id: string }>("/compras", {
+        proveedorId,
         observaciones: observaciones || undefined,
       });
 
       for (const item of items) {
-        await post(`/ventas/${venta.id}/items`, {
+        await post(`/compras/${compra.id}/items`, {
           productoId: item.productoId,
           cantidad: item.cantidad,
-          descuento: item.descuento,
+          precioUnitario: item.precioUnitario,
+          alicuotaIva: item.alicuotaIva,
         });
       }
 
-      toast({ title: "Venta creada correctamente" });
-      router.push(`/ventas/${venta.id}`);
+      toast({ title: "Compra creada correctamente" });
+      router.push(`/compras/${compra.id}`);
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
       toast({
         title: "Error",
-        description: axiosError.response?.data?.message ?? "No se pudo crear la venta",
+        description:
+          axiosError.response?.data?.message ?? "No se pudo crear la compra",
         variant: "destructive",
       });
     } finally {
@@ -247,99 +269,40 @@ export default function NuevaVentaPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Nueva Venta</h1>
+        <h1 className="text-2xl font-bold">Nueva Compra</h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Datos de la venta</CardTitle>
+          <CardTitle>Datos de la compra</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Cliente *</Label>
-              <Select value={clienteId} onValueChange={handleClienteChange}>
+              <Label>Proveedor *</Label>
+              <Select value={proveedorId} onValueChange={setProveedorId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente" />
+                  <SelectValue placeholder="Seleccionar proveedor" />
                 </SelectTrigger>
                 <SelectContent>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.razonSocial}
+                  {proveedores.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.razonSocial}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
-              <Label>Lista de Precio *</Label>
-              <Select
-                value={listaPrecio}
-                onValueChange={(val) => setListaPrecio(val as ListaPrecio)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar lista" />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.values(ListaPrecio).map((lp) => (
-                    <SelectItem key={lp} value={lp}>
-                      {formatListaPrecio(lp)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tipo de Venta</Label>
-              <Select value={tipoVenta} onValueChange={(v) => setTipoVenta(v as "EN_BLANCO" | "EN_NEGRO")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EN_BLANCO">En blanco (fiscal)</SelectItem>
-                  <SelectItem value="EN_NEGRO">En negro (ticket interno)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Discriminar IVA</Label>
-              <div className="flex items-center gap-2 pt-2">
-                <input
-                  type="checkbox"
-                  checked={conIva}
-                  onChange={(e) => setConIva(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                  id="conIva"
-                />
-                <Label htmlFor="conIva" className="font-normal">
-                  {conIva ? "Sí" : "No"}
-                </Label>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Dto. General %</Label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
-                value={descuentoGeneral}
-                onChange={(e) => setDescuentoGeneral(Number(e.target.value))}
+              <Label>Observaciones</Label>
+              <Textarea
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                placeholder="Observaciones opcionales..."
+                rows={3}
               />
             </div>
           </div>
-
-          {tipoVenta === "EN_NEGRO" && (
-            <div className="mt-3">
-              <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-                Venta en negro - Se generara un ticket interno (sin factura fiscal)
-              </Badge>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -348,8 +311,8 @@ export default function NuevaVentaPage() {
           <CardTitle>Agregar productos</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-end gap-4">
-            <div className="flex-1 space-y-2">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="flex-1 min-w-[200px] space-y-2">
               <Label>Producto</Label>
               <Select value={selectedProductoId} onValueChange={setSelectedProductoId}>
                 <SelectTrigger>
@@ -358,7 +321,7 @@ export default function NuevaVentaPage() {
                 <SelectContent>
                   <div className="p-2">
                     <Input
-                      placeholder="Buscar por nombre o codigo..."
+                      placeholder="Buscar por nombre o código..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="mb-2"
@@ -366,21 +329,12 @@ export default function NuevaVentaPage() {
                   </div>
                   {filteredProductos.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre} (Stock: {p.stockActual})
+                      {p.codigo} - {p.nombre} (IVA: {p.alicuotaIva}%)
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {selectedProducto && (
-              <div className="space-y-2">
-                <Label>Precio</Label>
-                <p className="text-sm pt-2">
-                  {formatCurrency(getPrecioForLista(selectedProducto))}
-                </p>
-              </div>
-            )}
 
             <div className="w-28 space-y-2">
               <Label>Cantidad</Label>
@@ -392,7 +346,31 @@ export default function NuevaVentaPage() {
               />
             </div>
 
-            <Button onClick={handleAddItem} disabled={!selectedProductoId || !listaPrecio}>
+            <div className="w-36 space-y-2">
+              <Label>Precio de compra</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={precioUnitario || ""}
+                onChange={(e) => setPrecioUnitario(Number(e.target.value) || 0)}
+                placeholder="0.00"
+              />
+            </div>
+
+            {selectedProducto && (
+              <div className="space-y-2">
+                <Label>IVA (auto)</Label>
+                <p className="text-sm pt-2 text-muted-foreground">
+                  {selectedProducto.alicuotaIva}%
+                </p>
+              </div>
+            )}
+
+            <Button
+              onClick={handleAddItem}
+              disabled={!selectedProductoId || cantidad <= 0}
+            >
               Agregar
             </Button>
           </div>
@@ -412,7 +390,6 @@ export default function NuevaVentaPage() {
                     <TableHead>Producto</TableHead>
                     <TableHead className="w-24">Cantidad</TableHead>
                     <TableHead>Precio Unit.</TableHead>
-                    <TableHead className="w-20">Dto. %</TableHead>
                     <TableHead>IVA %</TableHead>
                     <TableHead>Subtotal</TableHead>
                     <TableHead>IVA</TableHead>
@@ -431,20 +408,28 @@ export default function NuevaVentaPage() {
                           type="number"
                           min="1"
                           value={item.cantidad}
-                          onChange={(e) => handleUpdateCantidad(item.productoId, Number(e.target.value))}
+                          onChange={(e) =>
+                            handleUpdateCantidad(
+                              item.productoId,
+                              Number(e.target.value)
+                            )
+                          }
                           className="w-20"
                         />
                       </TableCell>
-                      <TableCell>{formatCurrency(item.precioUnitario)}</TableCell>
                       <TableCell>
                         <Input
                           type="number"
                           min="0"
-                          max="100"
-                          step="0.5"
-                          value={item.descuento}
-                          onChange={(e) => handleUpdateDescuento(item.productoId, Number(e.target.value))}
-                          className="w-16"
+                          step="0.01"
+                          value={item.precioUnitario}
+                          onChange={(e) =>
+                            handleUpdatePrecio(
+                              item.productoId,
+                              Number(e.target.value)
+                            )
+                          }
+                          className="w-24"
                         />
                       </TableCell>
                       <TableCell>{item.alicuotaIva}%</TableCell>
@@ -452,7 +437,11 @@ export default function NuevaVentaPage() {
                       <TableCell>{formatCurrency(item.montoIva)}</TableCell>
                       <TableCell>{formatCurrency(item.total)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => handleRemoveItem(item.productoId)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveItem(item.productoId)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </TableCell>
@@ -467,17 +456,8 @@ export default function NuevaVentaPage() {
 
       <Card>
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Observaciones</Label>
-              <Textarea
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                placeholder="Observaciones opcionales..."
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2 text-right">
+          <div className="flex justify-end">
+            <div className="w-64 space-y-2 text-right">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Subtotal:</span>
                 <span className="font-medium">{formatCurrency(totals.subtotal)}</span>
@@ -486,12 +466,6 @@ export default function NuevaVentaPage() {
                 <span className="text-muted-foreground">Total IVA:</span>
                 <span className="font-medium">{formatCurrency(totals.totalIva)}</span>
               </div>
-              {totals.totalDescuento > 0 && (
-                <div className="flex justify-between text-green-600">
-                  <span>Descuento ({descuentoGeneral}%):</span>
-                  <span className="font-medium">-{formatCurrency(totals.totalDescuento)}</span>
-                </div>
-              )}
               <div className="flex justify-between border-t pt-2">
                 <span className="text-lg font-bold">Total:</span>
                 <span className="text-lg font-bold">{formatCurrency(totals.total)}</span>
@@ -499,10 +473,14 @@ export default function NuevaVentaPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-6">
-            <Button variant="outline" onClick={() => router.push("/ventas")} disabled={isSaving}>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/compras")}
+              disabled={isSaving}
+            >
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving || items.length === 0}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Guardar Borrador
             </Button>

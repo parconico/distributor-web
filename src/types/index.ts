@@ -131,6 +131,24 @@ export enum EstadoVenta {
   ANULADA = 'ANULADA',
 }
 
+export enum TipoVenta {
+  EN_BLANCO = 'EN_BLANCO',
+  EN_NEGRO = 'EN_NEGRO',
+}
+
+export enum EstadoRemito {
+  BORRADOR = 'BORRADOR',
+  CONFIRMADO = 'CONFIRMADO',
+  ANULADO = 'ANULADO',
+}
+
+export enum EstadoCompra {
+  BORRADOR = 'BORRADOR',
+  CONFIRMADA = 'CONFIRMADA',
+  RECIBIDA = 'RECIBIDA',
+  ANULADA = 'ANULADA',
+}
+
 export enum TipoMovimientoStock {
   ENTRADA = 'ENTRADA',
   SALIDA = 'SALIDA',
@@ -145,15 +163,20 @@ export interface Venta {
   vendedorId: string;
   vendedor?: User;
   listaPrecio: ListaPrecio;
+  tipoVenta: TipoVenta;
   conIva: boolean;
+  descuentoTotal: number;
   subtotal: number;
   totalIva: number;
+  totalDescuento: number;
   total: number;
   estado: EstadoVenta;
   observaciones?: string;
   createdAt: string;
   updatedAt: string;
   items?: VentaItem[];
+  ticketInterno?: TicketInterno;
+  comprobantes?: Comprobante[];
 }
 
 export interface VentaItem {
@@ -163,10 +186,19 @@ export interface VentaItem {
   producto?: Producto;
   cantidad: number;
   precioUnitario: number;
+  descuento: number;
   alicuotaIva: number;
   subtotal: number;
   montoIva: number;
   total: number;
+}
+
+export interface TicketInterno {
+  id: string;
+  ventaId: string;
+  numero: number;
+  importeTotal: number;
+  createdAt: string;
 }
 
 export interface MovimientoStock {
@@ -243,6 +275,57 @@ export interface ComprobanteIva {
   alicuotaId: number;
   baseImponible: number;
   importe: number;
+}
+
+export interface Remito {
+  id: string;
+  numero: number;
+  clienteId: string;
+  cliente?: Cliente;
+  ventaId?: string;
+  venta?: Venta;
+  estado: EstadoRemito;
+  observaciones?: string;
+  afectaStock: boolean;
+  createdAt: string;
+  updatedAt: string;
+  items?: RemitoItem[];
+}
+
+export interface RemitoItem {
+  id: string;
+  remitoId: string;
+  productoId: string;
+  producto?: Producto;
+  cantidad: number;
+}
+
+export interface Compra {
+  id: string;
+  numero: number;
+  proveedorId: string;
+  proveedor?: Proveedor;
+  subtotal: number;
+  totalIva: number;
+  total: number;
+  estado: EstadoCompra;
+  observaciones?: string;
+  createdAt: string;
+  updatedAt: string;
+  items?: CompraItem[];
+}
+
+export interface CompraItem {
+  id: string;
+  compraId: string;
+  productoId: string;
+  producto?: Producto;
+  cantidad: number;
+  precioUnitario: number;
+  alicuotaIva: number;
+  subtotal: number;
+  montoIva: number;
+  total: number;
 }
 
 export interface ArcaConfig {

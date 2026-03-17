@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { get, post } from "@/lib/api-client";
+import { get, post, del } from "@/lib/api-client";
 import { ArcaConfig } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, CheckCircle2, XCircle, ArrowRight, Settings2, Zap } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle, ArrowRight, Settings2, Zap, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
 
 type SetupMode = "auto" | "manual" | null;
@@ -70,6 +70,7 @@ export default function ArcaConfiguracionPage() {
         <ExistingConfigCard
           config={existingConfig}
           onReconfigure={() => setSetupMode(null)}
+          onDeleted={() => setExistingConfig(null)}
         />
       )}
 
@@ -123,8 +124,17 @@ export default function ArcaConfiguracionPage() {
   );
 }
 
-function ExistingConfigCard({ config }: { config: ArcaConfig; onReconfigure: () => void }) {
+function ExistingConfigCard({
+  config,
+  onDeleted,
+}: {
+  config: ArcaConfig;
+  onReconfigure: () => void;
+  onDeleted: () => void;
+}) {
   const [isTesting, setIsTesting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     message: string;
@@ -149,6 +159,24 @@ function ExistingConfigCard({ config }: { config: ArcaConfig; onReconfigure: () 
       });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await del("/arca/config");
+      toast({ title: "Configuración eliminada" });
+      onDeleted();
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la configuración",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setConfirmDelete(false);
     }
   };
 
@@ -180,6 +208,38 @@ function ExistingConfigCard({ config }: { config: ArcaConfig; onReconfigure: () 
             {isTesting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Test Conexión
           </Button>
+
+          {!confirmDelete ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar
+            </Button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Confirmar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+                disabled={isDeleting}
+              >
+                Cancelar
+              </Button>
+            </div>
+          )}
         </div>
 
         {testResult && (

@@ -61,8 +61,8 @@ export default function FamiliasPage() {
 
   const fetchFamilias = async () => {
     try {
-      const data = await get<Familia[]>("/familias");
-      setFamilias(data);
+      const response = await get<{ data: Familia[] }>("/familias?page=1&limit=100");
+      setFamilias(response.data);
     } catch {
       toast({
         title: "Error",

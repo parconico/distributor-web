@@ -1,4 +1,4 @@
-import { CondicionIva, EstadoVenta, ListaPrecio, TipoComprobante, TipoMovimientoCuenta, TipoMovimientoStock } from "@/types";
+import { CondicionIva, EstadoVenta, EstadoRemito, EstadoCompra, ListaPrecio, TipoComprobante, TipoMovimientoCuenta, TipoMovimientoStock } from "@/types";
 
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("es-AR", {
@@ -78,4 +78,42 @@ export function formatTipoComprobante(tipo: TipoComprobante): string {
 
 export function formatPuntoVentaNumero(pv: number, num: number): string {
   return `${String(pv).padStart(5, '0')}-${String(num).padStart(8, '0')}`;
+}
+
+export function formatEstadoRemito(estado: EstadoRemito): string {
+  const labels: Record<EstadoRemito, string> = {
+    [EstadoRemito.BORRADOR]: "Borrador",
+    [EstadoRemito.CONFIRMADO]: "Confirmado",
+    [EstadoRemito.ANULADO]: "Anulado",
+  };
+  return labels[estado] ?? estado;
+}
+
+export function estadoRemitoVariant(estado: EstadoRemito): "default" | "secondary" | "destructive" | "outline" {
+  const variants: Record<EstadoRemito, "default" | "secondary" | "destructive" | "outline"> = {
+    [EstadoRemito.BORRADOR]: "outline",
+    [EstadoRemito.CONFIRMADO]: "default",
+    [EstadoRemito.ANULADO]: "destructive",
+  };
+  return variants[estado] ?? "outline";
+}
+
+export function formatEstadoCompra(estado: EstadoCompra): string {
+  const labels: Record<EstadoCompra, string> = {
+    [EstadoCompra.BORRADOR]: "Borrador",
+    [EstadoCompra.CONFIRMADA]: "Confirmada",
+    [EstadoCompra.RECIBIDA]: "Recibida",
+    [EstadoCompra.ANULADA]: "Anulada",
+  };
+  return labels[estado] ?? estado;
+}
+
+export function estadoCompraVariant(estado: EstadoCompra): "default" | "secondary" | "destructive" | "outline" {
+  const variants: Record<EstadoCompra, "default" | "secondary" | "destructive" | "outline"> = {
+    [EstadoCompra.BORRADOR]: "outline",
+    [EstadoCompra.CONFIRMADA]: "default",
+    [EstadoCompra.RECIBIDA]: "secondary",
+    [EstadoCompra.ANULADA]: "destructive",
+  };
+  return variants[estado] ?? "outline";
 }

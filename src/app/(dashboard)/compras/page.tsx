@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { get, del } from "@/lib/api-client";
-import { Venta, PaginatedResponse, EstadoVenta, Role } from "@/types";
-import { formatCurrency, formatListaPrecio, formatEstadoVenta, estadoVentaVariant } from "@/lib/formatters";
+import { Compra, PaginatedResponse, EstadoCompra, Role } from "@/types";
+import { formatCurrency, formatEstadoCompra, estadoCompraVariant } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/tables/data-table";
 import { RoleGate } from "@/components/shared/role-gate";
@@ -33,24 +33,24 @@ import {
 import { Eye, Loader2, Plus, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
 
-export default function VentasPage() {
+export default function ComprasPage() {
   const router = useRouter();
-  const [ventas, setVentas] = useState<Venta[]>([]);
-  const [filteredVentas, setFilteredVentas] = useState<Venta[]>([]);
+  const [compras, setCompras] = useState<Compra[]>([]);
+  const [filteredCompras, setFilteredCompras] = useState<Compra[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
 
-  const fetchVentas = async () => {
+  const fetchCompras = async () => {
     try {
-      const response = await get<PaginatedResponse<Venta>>(
-        "/ventas?page=1&limit=100"
+      const response = await get<PaginatedResponse<Compra>>(
+        "/compras?page=1&limit=100"
       );
-      setVentas(response.data);
-      setFilteredVentas(response.data);
+      setCompras(response.data);
+      setFilteredCompras(response.data);
     } catch {
       toast({
         title: "Error",
-        description: "No se pudieron cargar las ventas",
+        description: "No se pudieron cargar las compras",
         variant: "destructive",
       });
     } finally {
@@ -59,20 +59,20 @@ export default function VentasPage() {
   };
 
   useEffect(() => {
-    fetchVentas();
+    fetchCompras();
   }, []);
 
   const handleDelete = async (id: string) => {
     try {
-      await del(`/ventas/${id}`);
-      toast({ title: "Venta eliminada correctamente" });
-      fetchVentas();
+      await del(`/compras/${id}`);
+      toast({ title: "Compra eliminada correctamente" });
+      fetchCompras();
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
       toast({
         title: "Error",
         description:
-          axiosError.response?.data?.message ?? "No se pudo eliminar la venta",
+          axiosError.response?.data?.message ?? "No se pudo eliminar la compra",
         variant: "destructive",
       });
     }
@@ -80,17 +80,13 @@ export default function VentasPage() {
 
   useEffect(() => {
     if (estadoFilter === "all") {
-      setFilteredVentas(ventas);
+      setFilteredCompras(compras);
     } else {
-      setFilteredVentas(ventas.filter((v) => v.estado === estadoFilter));
+      setFilteredCompras(compras.filter((c) => c.estado === estadoFilter));
     }
-  }, [estadoFilter, ventas]);
+  }, [estadoFilter, compras]);
 
-  const columns: ColumnDef<Venta>[] = [
-    {
-      accessorKey: "numero",
-      header: "#",
-    },
+  const columns: ColumnDef<Compra>[] = [
     {
       accessorKey: "createdAt",
       header: "Fecha",
@@ -98,22 +94,13 @@ export default function VentasPage() {
         new Date(row.original.createdAt).toLocaleDateString("es-AR"),
     },
     {
-      id: "cliente",
-      header: "Cliente",
-      cell: ({ row }) => row.original.cliente?.razonSocial ?? "-",
+      accessorKey: "numero",
+      header: "Número",
     },
     {
-      id: "vendedor",
-      header: "Vendedor",
-      cell: ({ row }) => {
-        const v = row.original.vendedor;
-        return v ? `${v.firstName} ${v.lastName}` : "-";
-      },
-    },
-    {
-      accessorKey: "listaPrecio",
-      header: "Lista",
-      cell: ({ row }) => formatListaPrecio(row.original.listaPrecio),
+      id: "proveedor",
+      header: "Proveedor",
+      cell: ({ row }) => row.original.proveedor?.razonSocial ?? "-",
     },
     {
       accessorKey: "total",
@@ -124,8 +111,8 @@ export default function VentasPage() {
       accessorKey: "estado",
       header: "Estado",
       cell: ({ row }) => (
-        <Badge variant={estadoVentaVariant(row.original.estado)}>
-          {formatEstadoVenta(row.original.estado)}
+        <Badge variant={estadoCompraVariant(row.original.estado)}>
+          {formatEstadoCompra(row.original.estado)}
         </Badge>
       ),
     },
@@ -133,18 +120,18 @@ export default function VentasPage() {
       id: "acciones",
       header: "Acciones",
       cell: ({ row }) => {
-        const venta = row.original;
+        const compra = row.original;
         return (
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push(`/ventas/${venta.id}`)}
+              onClick={() => router.push(`/compras/${compra.id}`)}
             >
               <Eye className="h-4 w-4" />
             </Button>
-            {venta.estado === "BORRADOR" && (
-              <RoleGate allowedRoles={[Role.ADMIN]}>
+            {compra.estado === EstadoCompra.BORRADOR && (
+              <RoleGate allowedRoles={[Role.ADMIN, Role.DEPOSITO]}>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm">
@@ -153,15 +140,15 @@ export default function VentasPage() {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Eliminar venta</AlertDialogTitle>
+                      <AlertDialogTitle>Eliminar compra</AlertDialogTitle>
                       <AlertDialogDescription>
-                        ¿Está seguro de que desea eliminar la venta #{venta.numero}?
+                        ¿Está seguro de que desea eliminar la compra #{compra.numero}?
                         Esta acción no se puede deshacer.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => handleDelete(venta.id)}>
+                      <AlertDialogAction onClick={() => handleDelete(compra.id)}>
                         Eliminar
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -186,12 +173,12 @@ export default function VentasPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Ventas</h1>
-        <RoleGate allowedRoles={[Role.ADMIN, Role.VENDEDOR]}>
+        <h1 className="text-2xl font-bold">Compras</h1>
+        <RoleGate allowedRoles={[Role.ADMIN, Role.DEPOSITO]}>
           <Button asChild>
-            <Link href="/ventas/nueva">
+            <Link href="/compras/nueva">
               <Plus className="mr-2 h-4 w-4" />
-              Nueva Venta
+              Nueva Compra
             </Link>
           </Button>
         </RoleGate>
@@ -203,9 +190,9 @@ export default function VentasPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos los estados</SelectItem>
-            {Object.values(EstadoVenta).map((estado) => (
+            {Object.values(EstadoCompra).map((estado) => (
               <SelectItem key={estado} value={estado}>
-                {formatEstadoVenta(estado)}
+                {formatEstadoCompra(estado)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -213,9 +200,9 @@ export default function VentasPage() {
       </div>
       <DataTable
         columns={columns}
-        data={filteredVentas}
+        data={filteredCompras}
         searchKey="numero"
-        searchPlaceholder="Buscar ventas..."
+        searchPlaceholder="Buscar compras..."
       />
     </div>
   );

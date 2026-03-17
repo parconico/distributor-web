@@ -51,6 +51,9 @@ const productoSchema = z.object({
     required_error: "La unidad de medida es obligatoria",
   }),
   alicuotaIva: z.coerce.number({ required_error: "La alícuota es obligatoria" }),
+  stockActual: z.coerce
+    .number({ invalid_type_error: "Debe ser un número" })
+    .min(0, "El stock actual no puede ser negativo"),
   stockMinimo: z.coerce
     .number({ invalid_type_error: "Debe ser un número" })
     .min(0, "El stock mínimo no puede ser negativo"),
@@ -85,6 +88,7 @@ export function ProductoForm({ producto }: ProductoFormProps) {
       proveedorId: producto?.proveedorId ?? "",
       unidadMedida: producto?.unidadMedida ?? undefined,
       alicuotaIva: producto?.alicuotaIva ?? 21,
+      stockActual: producto?.stockActual ?? 0,
       stockMinimo: producto?.stockMinimo ?? 0,
     },
   });
@@ -97,12 +101,12 @@ export function ProductoForm({ producto }: ProductoFormProps) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [familiasData, proveedoresData] = await Promise.all([
-          get<Familia[]>("/familias"),
+        const [familiasRes, proveedoresRes] = await Promise.all([
+          get<PaginatedResponse<Familia>>("/familias?page=1&limit=100"),
           get<PaginatedResponse<Proveedor>>("/proveedores?page=1&limit=100"),
         ]);
-        setFamilias(familiasData);
-        setProveedores(proveedoresData.data);
+        setFamilias(familiasRes.data);
+        setProveedores(proveedoresRes.data);
       } catch {
         toast({
           title: "Error",
@@ -296,6 +300,23 @@ export function ProductoForm({ producto }: ProductoFormProps) {
               {errors.alicuotaIva && (
                 <p className="text-sm text-destructive">
                   {errors.alicuotaIva.message}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="stockActual">Stock Actual *</Label>
+              <Input
+                id="stockActual"
+                type="number"
+                min="0"
+                step="0.001"
+                {...register("stockActual")}
+                placeholder="0"
+              />
+              {errors.stockActual && (
+                <p className="text-sm text-destructive">
+                  {errors.stockActual.message}
                 </p>
               )}
             </div>
