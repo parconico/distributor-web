@@ -49,6 +49,13 @@ export default function CuentaCorrienteDetailPage() {
   const [pagoDescripcion, setPagoDescripcion] = useState("Pago recibido");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Saldo a favor dialog state
+  const [saldoFavorOpen, setSaldoFavorOpen] = useState(false);
+  const [saldoFavorMonto, setSaldoFavorMonto] = useState<number>(0);
+  const [saldoFavorMetodoPago, setSaldoFavorMetodoPago] = useState<MetodoPago>(MetodoPago.EFECTIVO);
+  const [saldoFavorDescripcion, setSaldoFavorDescripcion] = useState("Saldo a favor");
+  const [isSubmittingSaldo, setIsSubmittingSaldo] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
       const [clienteData, movimientosData, saldoData] = await Promise.all([
@@ -108,6 +115,43 @@ export default function CuentaCorrienteDetailPage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleCargarSaldoFavor = async () => {
+    if (saldoFavorMonto <= 0) {
+      toast({
+        title: "Error",
+        description: "El monto debe ser mayor a 0",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsSubmittingSaldo(true);
+      await post("/cuentas-corrientes/pago", {
+        clienteId,
+        monto: saldoFavorMonto,
+        metodoPago: saldoFavorMetodoPago,
+        descripcion: saldoFavorDescripcion || "Saldo a favor",
+      });
+      toast({ title: "Saldo a favor cargado correctamente" });
+      setSaldoFavorOpen(false);
+      setSaldoFavorMonto(0);
+      setSaldoFavorMetodoPago(MetodoPago.EFECTIVO);
+      setSaldoFavorDescripcion("Saldo a favor");
+      await fetchData();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description:
+          axiosError.response?.data?.message ?? "No se pudo cargar el saldo a favor",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingSaldo(false);
     }
   };
 
@@ -253,22 +297,122 @@ export default function CuentaCorrienteDetailPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <Dialog open={saldoFavorOpen} onOpenChange={setSaldoFavorOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">Cargar Saldo a Favor</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Cargar Saldo a Favor</DialogTitle>
+                <DialogDescription>
+                  Asignar un saldo a favor para {cliente.razonSocial}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="saldo-favor-monto">Monto</Label>
+                  <Input
+                    id="saldo-favor-monto"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={saldoFavorMonto || ""}
+                    onChange={(e) => setSaldoFavorMonto(Number(e.target.value))}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Método de Pago</Label>
+                  <Select
+                    value={saldoFavorMetodoPago}
+                    onValueChange={(value) => setSaldoFavorMetodoPago(value as MetodoPago)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar método" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
+                      <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="saldo-favor-descripcion">Descripción (opcional)</Label>
+                  <Input
+                    id="saldo-favor-descripcion"
+                    value={saldoFavorDescripcion}
+                    onChange={(e) => setSaldoFavorDescripcion(e.target.value)}
+                    placeholder="Saldo a favor"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setSaldoFavorOpen(false)}
+                  disabled={isSubmittingSaldo}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleCargarSaldoFavor}
+                  disabled={isSubmittingSaldo || saldoFavorMonto <= 0}
+                >
+                  {isSubmittingSaldo && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Cargar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" onClick={() => router.push("/cuentas-corrientes")}>
             Volver
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Saldo Actual</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className={`text-3xl font-bold ${saldo > 0 ? "text-red-600" : "text-green-600"}`}>
-            {formatCurrency(saldo)}
-          </p>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">
+              {saldo > 0 ? "Deuda" : saldo < 0 ? "Saldo a Favor" : "Saldo"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className={`text-3xl font-bold ${
+              saldo > 0
+                ? "text-red-600"
+                : saldo < 0
+                  ? "text-green-600"
+                  : ""
+            }`}>
+              {saldo < 0 ? formatCurrency(Math.abs(saldo)) : formatCurrency(saldo)}
+            </p>
+            {saldo < 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                El cliente tiene crédito disponible
+              </p>
+            )}
+            {saldo > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                El cliente tiene deuda pendiente
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Movimientos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{movimientos.length}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Total de movimientos registrados
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Movimientos</h2>

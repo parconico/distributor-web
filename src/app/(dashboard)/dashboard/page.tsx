@@ -27,6 +27,9 @@ import {
   ShoppingCart,
   AlertTriangle,
   Users,
+  TrendingUp,
+  TrendingDown,
+  ArrowDownUp,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -161,6 +164,100 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Compras vs Ventas del Mes */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-base font-semibold">Compras vs Ventas del Mes</CardTitle>
+          <ArrowDownUp className="h-5 w-5 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <TrendingDown className="h-3.5 w-3.5" />
+                    Compras
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(kpis?.comprasVsVentas?.compras.total ?? 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {kpis?.comprasVsVentas?.compras.cantidad ?? 0} orden(es)
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                    Ventas
+                  </p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(kpis?.comprasVsVentas?.ventas.total ?? 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {kpis?.comprasVsVentas?.ventas.cantidad ?? 0} venta(s)
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Margen Bruto</p>
+                  <p
+                    className={`text-2xl font-bold ${
+                      (kpis?.comprasVsVentas?.margen.bruto ?? 0) >= 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {formatCurrency(kpis?.comprasVsVentas?.margen.bruto ?? 0)}
+                  </p>
+                  <p
+                    className={`text-xs font-medium ${
+                      (kpis?.comprasVsVentas?.margen.porcentaje ?? 0) >= 0
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-600 dark:text-red-400"
+                    }`}
+                  >
+                    {kpis?.comprasVsVentas?.margen.porcentaje?.toFixed(1) ?? "0.0"}%
+                  </p>
+                </div>
+              </div>
+              {/* Visual bar comparison */}
+              {(() => {
+                const compras = kpis?.comprasVsVentas?.compras.total ?? 0;
+                const ventas = kpis?.comprasVsVentas?.ventas.total ?? 0;
+                const max = Math.max(compras, ventas, 1);
+                return (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-16">Compras</span>
+                      <div className="flex-1 bg-muted rounded-full h-3">
+                        <div
+                          className="bg-orange-500 h-3 rounded-full transition-all"
+                          style={{ width: `${(compras / max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-16">Ventas</span>
+                      <div className="flex-1 bg-muted rounded-full h-3">
+                        <div
+                          className="bg-blue-500 h-3 rounded-full transition-all"
+                          style={{ width: `${(ventas / max) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Últimas Ventas */}
       <Card>

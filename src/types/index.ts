@@ -368,6 +368,11 @@ export interface ContribuyenteArca {
 export interface DashboardKpis {
   ventasHoy: { count: number; total: number };
   ventasMes: { count: number; total: number };
+  comprasVsVentas: {
+    compras: { cantidad: number; total: number };
+    ventas: { cantidad: number; total: number };
+    margen: { bruto: number; porcentaje: number };
+  };
   deudaTotal: number;
   productosBajoStock: number;
   ultimasVentas: Venta[];
