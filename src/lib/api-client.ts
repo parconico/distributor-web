@@ -1,10 +1,9 @@
 import axios, { AxiosRequestConfig, AxiosError } from "axios";
 
-const baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const baseURL = "/api";
 
 const apiClient = axios.create({
   baseURL,
-  withCredentials: true,
   headers: {
     "Content-Type": "application/json",
   },
@@ -12,7 +11,6 @@ const apiClient = axios.create({
 
 const refreshClient = axios.create({
   baseURL,
-  withCredentials: true,
 });
 
 let isRefreshing = false;
