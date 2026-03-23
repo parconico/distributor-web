@@ -63,7 +63,7 @@ export function DataTable<TData, TValue>({
             placeholder={searchPlaceholder}
             value={globalFilter}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="max-w-sm"
+            className="w-full sm:max-w-sm"
           />
         </div>
       )}
@@ -116,11 +116,11 @@ export function DataTable<TData, TValue>({
         </Table>
       </div>
       {pagination && (
-        <div className="flex items-center justify-between px-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between px-2">
           <div className="text-sm text-muted-foreground">
             {table.getFilteredRowModel().rows.length} resultado(s)
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -129,9 +129,8 @@ export function DataTable<TData, TValue>({
             >
               Anterior
             </Button>
-            <div className="text-sm text-muted-foreground">
-              Página {table.getState().pagination.pageIndex + 1} de{" "}
-              {table.getPageCount()}
+            <div className="text-xs sm:text-sm text-muted-foreground">
+              Pág. {table.getState().pagination.pageIndex + 1}/{table.getPageCount()}
             </div>
             <Button
               variant="outline"

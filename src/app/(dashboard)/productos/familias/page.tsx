@@ -224,7 +224,7 @@ export default function FamiliasPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Familias y Subfamilias</h1>
         <Button onClick={() => setShowNewFamilia(true)}>
           <Plus className="mr-2 h-4 w-4" />

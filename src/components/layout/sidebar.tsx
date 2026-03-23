@@ -40,8 +40,14 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { useSidebar } from "@/hooks/use-sidebar";
 import { Role } from "@/types";
 import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+} from "@/components/ui/sheet";
 
 interface NavItem {
   id: string;
@@ -183,7 +189,6 @@ function applyOrder(items: NavItem[], savedOrder: string[] | null): NavItem[] {
       map.delete(id);
     }
   }
-  // Append any new items not in saved order
   for (const item of map.values()) {
     ordered.push(item);
   }
@@ -194,10 +199,12 @@ function SortableNavLink({
   item,
   isActive,
   collapsed,
+  onNavigate,
 }: {
   item: NavItem;
   isActive: boolean;
   collapsed: boolean;
+  onNavigate?: () => void;
 }) {
   const {
     attributes,
@@ -236,8 +243,9 @@ function SortableNavLink({
       )}
       <Link
         href={item.href}
+        onClick={onNavigate}
         className={cn(
-          "flex flex-1 items-center gap-3 py-2 pr-3 text-sm font-medium",
+          "flex flex-1 items-center gap-3 py-2.5 pr-3 text-sm font-medium",
           collapsed ? "justify-center px-2" : "pl-1",
         )}
         title={collapsed ? item.label : undefined}
@@ -249,8 +257,13 @@ function SortableNavLink({
   );
 }
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+function SidebarNav({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
   const [orderedItems, setOrderedItems] = useState<NavItem[]>(defaultNavItems);
   const pathname = usePathname();
   const { user } = useAuth();
@@ -286,54 +299,78 @@ export function Sidebar() {
   );
 
   return (
-    <aside
-      className={cn(
-        "flex flex-col border-r bg-card transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
-      )}
-    >
-      <div className="flex h-16 items-center justify-between border-b px-4">
-        {!collapsed && (
-          <span className="text-lg font-bold text-primary">Distribuidora</span>
+    <nav className="flex-1 space-y-1 overflow-y-auto p-2">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={filteredItems.map((i) => i.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {filteredItems.map((item) => {
+            const isActive =
+              pathname === item.href || pathname.startsWith(item.href + "/");
+            return (
+              <SortableNavLink
+                key={item.id}
+                item={item}
+                isActive={isActive}
+                collapsed={collapsed}
+                onNavigate={onNavigate}
+              />
+            );
+          })}
+        </SortableContext>
+      </DndContext>
+    </nav>
+  );
+}
+
+export function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false);
+  const { mobileOpen, setMobileOpen } = useSidebar();
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          "hidden md:flex flex-col border-r bg-card transition-all duration-300",
+          collapsed ? "w-16" : "w-64"
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn(collapsed && "mx-auto")}
-        >
-          {collapsed ? (
-            <ChevronRight className="h-4 w-4" />
-          ) : (
-            <ChevronLeft className="h-4 w-4" />
+      >
+        <div className="flex h-16 items-center justify-between border-b px-4">
+          {!collapsed && (
+            <span className="text-lg font-bold text-primary">Distribuidora</span>
           )}
-        </Button>
-      </div>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-2">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={filteredItems.map((i) => i.id)}
-            strategy={verticalListSortingStrategy}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className={cn(collapsed && "mx-auto")}
           >
-            {filteredItems.map((item) => {
-              const isActive =
-                pathname === item.href || pathname.startsWith(item.href + "/");
-              return (
-                <SortableNavLink
-                  key={item.id}
-                  item={item}
-                  isActive={isActive}
-                  collapsed={collapsed}
-                />
-              );
-            })}
-          </SortableContext>
-        </DndContext>
-      </nav>
-    </aside>
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+        <SidebarNav collapsed={collapsed} />
+      </aside>
+
+      {/* Mobile sidebar (sheet) */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent side="left" className="w-72 p-0">
+          <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
+          <div className="flex h-16 items-center border-b px-4">
+            <span className="text-lg font-bold text-primary">Distribuidora</span>
+          </div>
+          <SidebarNav collapsed={false} onNavigate={() => setMobileOpen(false)} />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

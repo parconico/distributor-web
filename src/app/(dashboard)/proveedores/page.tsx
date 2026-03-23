@@ -143,7 +143,7 @@ export default function ProveedoresPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Proveedores</h1>
         <RoleGate allowedRoles={[Role.ADMIN]}>
           <Button asChild>

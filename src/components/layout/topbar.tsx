@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
-import { LogOut, Moon, Sun, User as UserIcon } from "lucide-react";
+import { LogOut, Menu, Moon, Sun, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useSidebar } from "@/hooks/use-sidebar";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -20,6 +21,7 @@ export function Topbar() {
   const { user, logout } = useAuth();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const { toggle } = useSidebar();
 
   const handleLogout = async () => {
     await logout();
@@ -31,9 +33,18 @@ export function Topbar() {
     : "";
 
   return (
-    <header className="flex h-16 items-center justify-between border-b bg-card px-6">
-      <div />
-      <div className="flex items-center gap-4">
+    <header className="flex h-14 md:h-16 items-center justify-between border-b bg-card px-3 md:px-6">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggle}
+        className="md:hidden"
+      >
+        <Menu className="h-5 w-5" />
+        <span className="sr-only">Abrir menú</span>
+      </Button>
+      <div className="hidden md:block" />
+      <div className="flex items-center gap-2 md:gap-4">
         <Button
           variant="ghost"
           size="icon"
@@ -45,7 +56,9 @@ export function Topbar() {
         </Button>
         {user && (
           <>
-            <Badge variant="secondary">{user.role}</Badge>
+            <Badge variant="secondary" className="hidden sm:inline-flex">
+              {user.role}
+            </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button

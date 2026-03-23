@@ -194,7 +194,7 @@ export default function VentasPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Ventas</h1>
         <RoleGate allowedRoles={[Role.ADMIN, Role.VENDEDOR]}>
           <Button asChild>
@@ -205,9 +205,9 @@ export default function VentasPage() {
           </Button>
         </RoleGate>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Filtrar por estado" />
           </SelectTrigger>
           <SelectContent>

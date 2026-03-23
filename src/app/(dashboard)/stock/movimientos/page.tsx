@@ -149,12 +149,12 @@ export default function MovimientosStockPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Movimientos de Stock</h1>
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Select value={productoFilter} onValueChange={setProductoFilter}>
-          <SelectTrigger className="w-[250px]">
+          <SelectTrigger className="w-full sm:w-[250px]">
             <SelectValue placeholder="Filtrar por producto" />
           </SelectTrigger>
           <SelectContent>
@@ -167,7 +167,7 @@ export default function MovimientosStockPage() {
           </SelectContent>
         </Select>
         <Select value={tipoFilter} onValueChange={setTipoFilter}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Filtrar por tipo" />
           </SelectTrigger>
           <SelectContent>
