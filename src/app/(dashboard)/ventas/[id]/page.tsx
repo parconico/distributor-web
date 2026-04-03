@@ -2,10 +2,12 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { get, post, del } from "@/lib/api-client";
+import { get, post, patch, del } from "@/lib/api-client";
 import {
   Venta,
   EstadoVenta,
+  TipoVenta,
+  MetodoPago,
   Producto,
   PaginatedResponse,
   Role,
@@ -22,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -50,7 +54,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RoleGate } from "@/components/shared/role-gate";
-import { Loader2, Trash2, Download } from "lucide-react";
+import { Loader2, Trash2, Download, Pencil, X, Save } from "lucide-react";
 import apiClient from "@/lib/api-client";
 import { AxiosError } from "axios";
 
@@ -66,6 +70,23 @@ export default function VentaDetailPage() {
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Edit mode state
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTipoVenta, setEditTipoVenta] = useState<TipoVenta>(TipoVenta.EN_BLANCO);
+  const [editDescuento, setEditDescuento] = useState(0);
+  const [editObservaciones, setEditObservaciones] = useState("");
+  const [editDiasCredito, setEditDiasCredito] = useState(30);
+  const [editPagos, setEditPagos] = useState<Record<MetodoPago, { selected: boolean; monto: number }>>({
+    [MetodoPago.EFECTIVO]: { selected: false, monto: 0 },
+    [MetodoPago.TRANSFERENCIA]: { selected: false, monto: 0 },
+    [MetodoPago.CUENTA_CORRIENTE]: { selected: false, monto: 0 },
+  });
+
+  // Inline item edit state
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemCantidad, setEditItemCantidad] = useState(0);
+  const [editItemDescuento, setEditItemDescuento] = useState(0);
 
   const fetchVenta = useCallback(async () => {
     try {
@@ -87,7 +108,7 @@ export default function VentaDetailPage() {
   }, [fetchVenta]);
 
   useEffect(() => {
-    if (venta?.estado === EstadoVenta.BORRADOR) {
+    if (venta?.estado === EstadoVenta.BORRADOR || venta?.estado === EstadoVenta.CONFIRMADA) {
       get<PaginatedResponse<Producto>>("/productos?page=1&limit=100")
         .then((res) => setProductos(res.data))
         .catch(() => {});
@@ -96,6 +117,7 @@ export default function VentaDetailPage() {
 
   const isDraft = venta?.estado === EstadoVenta.BORRADOR;
   const isConfirmed = venta?.estado === EstadoVenta.CONFIRMADA;
+  const canEdit = isDraft || isConfirmed;
 
   const getPrecioForLista = (producto: Producto): number => {
     if (!venta) return 0;
@@ -113,6 +135,96 @@ export default function VentaDetailPage() {
       p.codigo.toLowerCase().includes(lower)
     );
   });
+
+  const startEditing = () => {
+    if (!venta) return;
+    setEditTipoVenta(venta.tipoVenta as TipoVenta);
+    setEditDescuento(venta.descuentoTotal);
+    setEditObservaciones(venta.observaciones || "");
+    setEditDiasCredito(venta.diasCredito || 30);
+
+    const pagosState: Record<MetodoPago, { selected: boolean; monto: number }> = {
+      [MetodoPago.EFECTIVO]: { selected: false, monto: 0 },
+      [MetodoPago.TRANSFERENCIA]: { selected: false, monto: 0 },
+      [MetodoPago.CUENTA_CORRIENTE]: { selected: false, monto: 0 },
+    };
+    for (const p of venta.pagos) {
+      pagosState[p.metodoPago] = { selected: true, monto: Number(p.monto) };
+    }
+    setEditPagos(pagosState);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditingItemId(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!venta) return;
+    const selectedPagos = Object.entries(editPagos)
+      .filter(([, v]) => v.selected)
+      .map(([key, v]) => ({ metodoPago: key as MetodoPago, monto: v.monto }));
+
+    if (selectedPagos.length === 0) {
+      toast({ title: "Error", description: "Seleccione al menos un método de pago", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setIsActioning(true);
+      await patch(`/ventas/${venta.id}`, {
+        tipoVenta: editTipoVenta,
+        descuentoTotal: editDescuento,
+        observaciones: editObservaciones || null,
+        pagos: selectedPagos,
+        ...(selectedPagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) && {
+          diasCredito: editDiasCredito,
+        }),
+      });
+      toast({ title: "Venta actualizada" });
+      setIsEditing(false);
+      await fetchVenta();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description: axiosError.response?.data?.message ?? "No se pudo actualizar la venta",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActioning(false);
+    }
+  };
+
+  const startEditingItem = (item: { id: string; cantidad: number; descuento: number }) => {
+    setEditingItemId(item.id);
+    setEditItemCantidad(item.cantidad);
+    setEditItemDescuento(item.descuento);
+  };
+
+  const handleSaveItem = async () => {
+    if (!venta || !editingItemId) return;
+    try {
+      setIsActioning(true);
+      await patch(`/ventas/${venta.id}/items/${editingItemId}`, {
+        cantidad: editItemCantidad,
+        descuento: editItemDescuento,
+      });
+      toast({ title: "Item actualizado" });
+      setEditingItemId(null);
+      await fetchVenta();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description: axiosError.response?.data?.message ?? "No se pudo actualizar el item",
+        variant: "destructive",
+      });
+    } finally {
+      setIsActioning(false);
+    }
+  };
 
   const handleAddItem = async () => {
     if (!venta || !selectedProductoId) return;
@@ -248,6 +360,8 @@ export default function VentaDetailPage() {
     );
   }
 
+  const hasCuentaCorriente = editPagos[MetodoPago.CUENTA_CORRIENTE].selected;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -266,8 +380,26 @@ export default function VentaDetailPage() {
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          {isDraft && (
+        <div className="flex flex-wrap items-center gap-2">
+          {canEdit && !isEditing && (
+            <Button variant="outline" onClick={startEditing} disabled={isActioning}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+          )}
+          {isEditing && (
+            <>
+              <Button onClick={handleSaveEdit} disabled={isActioning}>
+                {isActioning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar
+              </Button>
+              <Button variant="outline" onClick={cancelEditing} disabled={isActioning}>
+                <X className="mr-2 h-4 w-4" />
+                Cancelar
+              </Button>
+            </>
+          )}
+          {isDraft && !isEditing && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button disabled={isActioning}>
@@ -355,98 +487,227 @@ export default function VentaDetailPage() {
         </div>
       </div>
 
-      {/* Header Info */}
+      {/* Header Info - Read Only or Edit Mode */}
       <Card>
         <CardHeader>
           <CardTitle>Detalle</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Fecha</p>
-              <p className="font-medium">
-                {new Date(venta.createdAt).toLocaleDateString("es-AR")}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Cliente</p>
-              <p className="font-medium">
-                {venta.cliente?.razonSocial ?? "-"}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Vendedor</p>
-              <p className="font-medium">
-                {venta.vendedor
-                  ? `${venta.vendedor.firstName} ${venta.vendedor.lastName}`
-                  : "-"}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Lista de Precio</p>
-              <p className="font-medium">
-                {formatListaPrecio(venta.listaPrecio)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Tipo de Venta</p>
-              <p className="font-medium">{venta.tipoVenta === "EN_BLANCO" ? "En blanco (fiscal)" : "En negro (ticket)"}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Discrimina IVA</p>
-              <p className="font-medium">{venta.conIva ? "Sí" : "No"}</p>
-            </div>
-            <div className="md:col-span-2">
-              <p className="text-sm text-muted-foreground">Métodos de Pago</p>
-              <div className="mt-1 space-y-1">
-                {venta.pagos.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2 text-sm font-medium">
-                    <span>{formatMetodoPago(p.metodoPago)}</span>
-                    {p.monto > 0 && (
-                      <span className="text-muted-foreground">— {formatCurrency(p.monto)}</span>
-                    )}
+          {isEditing ? (
+            <div className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {/* Read-only info */}
+                <div>
+                  <p className="text-sm text-muted-foreground">Fecha</p>
+                  <p className="font-medium">
+                    {new Date(venta.createdAt).toLocaleDateString("es-AR")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Cliente</p>
+                  <p className="font-medium">
+                    {venta.cliente?.razonSocial ?? "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Vendedor</p>
+                  <p className="font-medium">
+                    {venta.vendedor
+                      ? `${venta.vendedor.firstName} ${venta.vendedor.lastName}`
+                      : "-"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Lista de Precio</p>
+                  <p className="font-medium">
+                    {formatListaPrecio(venta.listaPrecio)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t pt-4 space-y-4">
+                {/* Tipo de Venta */}
+                <div className="space-y-2">
+                  <Label>Tipo de Venta</Label>
+                  <Select
+                    value={editTipoVenta}
+                    onValueChange={(v) => setEditTipoVenta(v as TipoVenta)}
+                  >
+                    <SelectTrigger className="w-full sm:w-64">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TipoVenta.EN_BLANCO}>En blanco (fiscal)</SelectItem>
+                      <SelectItem value={TipoVenta.EN_NEGRO}>En negro (ticket)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Descuento General */}
+                <div className="space-y-2">
+                  <Label>Descuento General (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editDescuento}
+                    onChange={(e) => setEditDescuento(Number(e.target.value))}
+                    className="w-full sm:w-32"
+                  />
+                </div>
+
+                {/* Métodos de Pago */}
+                <div className="space-y-2">
+                  <Label>Métodos de Pago</Label>
+                  <div className="space-y-3">
+                    {Object.values(MetodoPago).map((mp) => (
+                      <div key={mp} className="flex items-center gap-3">
+                        <Checkbox
+                          checked={editPagos[mp].selected}
+                          onCheckedChange={(checked: boolean) =>
+                            setEditPagos((prev) => ({
+                              ...prev,
+                              [mp]: { ...prev[mp], selected: checked },
+                            }))
+                          }
+                        />
+                        <span className="text-sm min-w-[140px]">{formatMetodoPago(mp)}</span>
+                        {editPagos[mp].selected && (
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={editPagos[mp].monto}
+                            onChange={(e) =>
+                              setEditPagos((prev) => ({
+                                ...prev,
+                                [mp]: { ...prev[mp], monto: Number(e.target.value) },
+                              }))
+                            }
+                            className="w-32"
+                            placeholder="Monto"
+                          />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                </div>
+
+                {/* Días de Crédito */}
+                {hasCuentaCorriente && (
+                  <div className="space-y-2">
+                    <Label>Días de Crédito</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={editDiasCredito}
+                      onChange={(e) => setEditDiasCredito(Number(e.target.value))}
+                      className="w-full sm:w-32"
+                    />
+                  </div>
+                )}
+
+                {/* Observaciones */}
+                <div className="space-y-2">
+                  <Label>Observaciones</Label>
+                  <Textarea
+                    value={editObservaciones}
+                    onChange={(e) => setEditObservaciones(e.target.value)}
+                    placeholder="Observaciones..."
+                    rows={3}
+                  />
+                </div>
               </div>
             </div>
-            {venta.diasCredito && (
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
-                <p className="text-sm text-muted-foreground">Días de Crédito</p>
-                <p className="font-medium">{venta.diasCredito} días</p>
-              </div>
-            )}
-            {venta.fechaVencimiento && (
-              <div>
-                <p className="text-sm text-muted-foreground">Vencimiento</p>
+                <p className="text-sm text-muted-foreground">Fecha</p>
                 <p className="font-medium">
-                  {new Date(venta.fechaVencimiento).toLocaleDateString("es-AR")}
+                  {new Date(venta.createdAt).toLocaleDateString("es-AR")}
                 </p>
               </div>
-            )}
-            {venta.descuentoTotal > 0 && (
               <div>
-                <p className="text-sm text-muted-foreground">Descuento General</p>
-                <p className="font-medium">{venta.descuentoTotal}%</p>
+                <p className="text-sm text-muted-foreground">Cliente</p>
+                <p className="font-medium">
+                  {venta.cliente?.razonSocial ?? "-"}
+                </p>
               </div>
-            )}
-            {venta.observaciones && (
+              <div>
+                <p className="text-sm text-muted-foreground">Vendedor</p>
+                <p className="font-medium">
+                  {venta.vendedor
+                    ? `${venta.vendedor.firstName} ${venta.vendedor.lastName}`
+                    : "-"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Lista de Precio</p>
+                <p className="font-medium">
+                  {formatListaPrecio(venta.listaPrecio)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Tipo de Venta</p>
+                <p className="font-medium">{venta.tipoVenta === "EN_BLANCO" ? "En blanco (fiscal)" : "En negro (ticket)"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Discrimina IVA</p>
+                <p className="font-medium">{venta.conIva ? "Sí" : "No"}</p>
+              </div>
               <div className="md:col-span-2">
-                <p className="text-sm text-muted-foreground">Observaciones</p>
-                <p className="font-medium">{venta.observaciones}</p>
+                <p className="text-sm text-muted-foreground">Métodos de Pago</p>
+                <div className="mt-1 space-y-1">
+                  {venta.pagos.map((p) => (
+                    <div key={p.id} className="flex items-center gap-2 text-sm font-medium">
+                      <span>{formatMetodoPago(p.metodoPago)}</span>
+                      {p.monto > 0 && (
+                        <span className="text-muted-foreground">— {formatCurrency(p.monto)}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            )}
-          </div>
+              {venta.diasCredito && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Días de Crédito</p>
+                  <p className="font-medium">{venta.diasCredito} días</p>
+                </div>
+              )}
+              {venta.fechaVencimiento && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Vencimiento</p>
+                  <p className="font-medium">
+                    {new Date(venta.fechaVencimiento).toLocaleDateString("es-AR")}
+                  </p>
+                </div>
+              )}
+              {venta.descuentoTotal > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Descuento General</p>
+                  <p className="font-medium">{venta.descuentoTotal}%</p>
+                </div>
+              )}
+              {venta.observaciones && (
+                <div className="md:col-span-2">
+                  <p className="text-sm text-muted-foreground">Observaciones</p>
+                  <p className="font-medium">{venta.observaciones}</p>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Add Items (Draft only) */}
-      {isDraft && (
+      {/* Add Items (BORRADOR or CONFIRMADA) */}
+      {canEdit && (
         <Card>
           <CardHeader>
             <CardTitle>Agregar producto</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-end gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-4">
               <div className="flex-1 space-y-2">
                 <Label>Producto</Label>
                 <Select
@@ -473,7 +734,7 @@ export default function VentaDetailPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="w-28 space-y-2">
+              <div className="w-full sm:w-28 space-y-2">
                 <Label>Cantidad</Label>
                 <Input
                   type="number"
@@ -485,6 +746,7 @@ export default function VentaDetailPage() {
               <Button
                 onClick={handleAddItem}
                 disabled={!selectedProductoId || isActioning}
+                className="w-full sm:w-auto"
               >
                 Agregar
               </Button>
@@ -499,7 +761,7 @@ export default function VentaDetailPage() {
           <CardTitle>Items</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -511,7 +773,7 @@ export default function VentaDetailPage() {
                   <TableHead>Subtotal</TableHead>
                   <TableHead>IVA</TableHead>
                   <TableHead>Total</TableHead>
-                  {isDraft && <TableHead className="w-16">Acciones</TableHead>}
+                  {canEdit && <TableHead className="w-24">Acciones</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -523,23 +785,81 @@ export default function VentaDetailPage() {
                           ? `${item.producto.codigo} - ${item.producto.nombre}`
                           : item.productoId}
                       </TableCell>
-                      <TableCell>{item.cantidad}</TableCell>
+                      <TableCell>
+                        {editingItemId === item.id ? (
+                          <Input
+                            type="number"
+                            min={0.001}
+                            step="any"
+                            value={editItemCantidad}
+                            onChange={(e) => setEditItemCantidad(Number(e.target.value))}
+                            className="w-20 h-8"
+                          />
+                        ) : (
+                          item.cantidad
+                        )}
+                      </TableCell>
                       <TableCell>{formatCurrency(item.precioUnitario)}</TableCell>
-                      <TableCell>{item.descuento > 0 ? `${item.descuento}%` : "-"}</TableCell>
+                      <TableCell>
+                        {editingItemId === item.id ? (
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={editItemDescuento}
+                            onChange={(e) => setEditItemDescuento(Number(e.target.value))}
+                            className="w-16 h-8"
+                          />
+                        ) : (
+                          item.descuento > 0 ? `${item.descuento}%` : "-"
+                        )}
+                      </TableCell>
                       <TableCell>{item.alicuotaIva}%</TableCell>
                       <TableCell>{formatCurrency(item.subtotal)}</TableCell>
                       <TableCell>{formatCurrency(item.montoIva)}</TableCell>
                       <TableCell>{formatCurrency(item.total)}</TableCell>
-                      {isDraft && (
+                      {canEdit && (
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveItem(item.id)}
-                            disabled={isActioning}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            {editingItemId === item.id ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleSaveItem}
+                                  disabled={isActioning}
+                                >
+                                  <Save className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setEditingItemId(null)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEditingItem(item)}
+                                  disabled={isActioning}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleRemoveItem(item.id)}
+                                  disabled={isActioning}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </TableCell>
                       )}
                     </TableRow>
@@ -547,7 +867,7 @@ export default function VentaDetailPage() {
                 ) : (
                   <TableRow>
                     <TableCell
-                      colSpan={isDraft ? 10 : 9}
+                      colSpan={canEdit ? 9 : 8}
                       className="h-24 text-center"
                     >
                       Sin items.
