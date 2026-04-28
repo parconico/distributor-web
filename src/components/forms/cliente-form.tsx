@@ -188,16 +188,22 @@ export function ClienteForm({ cliente, prefill }: ClienteFormProps) {
 
   const onSubmit = async (data: ClienteFormData) => {
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         ...data,
-        numeroDocumento:
-          data.tipoDocumento === "CUIT"
-            ? data.numeroDocumento.replace(/\D/g, "")
-            : data.numeroDocumento,
         email: data.email || undefined,
         direccion: data.direccion || undefined,
         telefono: data.telefono || undefined,
       };
+
+      if (data.tipoDocumento === "SIN_DOCUMENTO") {
+        delete payload.tipoDocumento;
+        delete payload.numeroDocumento;
+      } else {
+        payload.numeroDocumento =
+          data.tipoDocumento === "CUIT" || data.tipoDocumento === "CUIL"
+            ? (data.numeroDocumento ?? "").replace(/\D/g, "") || undefined
+            : data.numeroDocumento || undefined;
+      }
 
       if (isEditing) {
         await patch(`/clientes/${cliente.id}`, payload);
@@ -241,6 +247,7 @@ export function ClienteForm({ cliente, prefill }: ClienteFormProps) {
                   <SelectItem value="CUIT">CUIT</SelectItem>
                   <SelectItem value="DNI">DNI</SelectItem>
                   <SelectItem value="CUIL">CUIL</SelectItem>
+                  <SelectItem value="SIN_DOCUMENTO">Sin documento</SelectItem>
                 </SelectContent>
               </Select>
               {errors.tipoDocumento && (
@@ -250,58 +257,60 @@ export function ClienteForm({ cliente, prefill }: ClienteFormProps) {
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="numeroDocumento">Número de Documento</Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  {tipoDocumento === "CUIT" || tipoDocumento === "CUIL" ? (
-                    <CuitInput
-                      value={numeroDocumento}
-                      onChange={(val) =>
-                        setValue("numeroDocumento", val, {
-                          shouldValidate: true,
-                        })
-                      }
-                      error={errors.numeroDocumento?.message}
-                    />
-                  ) : (
-                    <>
-                      <Input
-                        id="numeroDocumento"
-                        {...register("numeroDocumento")}
-                        placeholder="Número de documento"
+            {tipoDocumento !== "SIN_DOCUMENTO" && (
+              <div className="space-y-2">
+                <Label htmlFor="numeroDocumento">Número de Documento</Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    {tipoDocumento === "CUIT" || tipoDocumento === "CUIL" ? (
+                      <CuitInput
+                        value={numeroDocumento}
+                        onChange={(val) =>
+                          setValue("numeroDocumento", val, {
+                            shouldValidate: true,
+                          })
+                        }
+                        error={errors.numeroDocumento?.message}
                       />
-                      {errors.numeroDocumento && (
-                        <p className="text-sm text-destructive">
-                          {errors.numeroDocumento.message}
-                        </p>
-                      )}
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <Input
+                          id="numeroDocumento"
+                          {...register("numeroDocumento")}
+                          placeholder="Número de documento"
+                        />
+                        {errors.numeroDocumento && (
+                          <p className="text-sm text-destructive">
+                            {errors.numeroDocumento.message}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={handleBuscarArca}
+                    disabled={isSearchingArca || !numeroDocumento}
+                    title="Buscar en ARCA"
+                    className="shrink-0"
+                  >
+                    {isSearchingArca ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={handleBuscarArca}
-                  disabled={isSearchingArca || !numeroDocumento}
-                  title="Buscar en ARCA"
-                  className="shrink-0"
-                >
-                  {isSearchingArca ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Search className="h-4 w-4" />
-                  )}
-                </Button>
+                {isSearchingArca && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Buscando en ARCA...
+                  </p>
+                )}
               </div>
-              {isSearchingArca && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Buscando en ARCA...
-                </p>
-              )}
-            </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="razonSocial">Razón Social *</Label>
