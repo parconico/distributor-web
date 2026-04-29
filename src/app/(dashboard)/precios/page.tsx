@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { get, post } from "@/lib/api-client";
 import { Familia, ListaPrecio, PrecioProducto } from "@/types";
 import { formatCurrency, formatListaPrecio } from "@/lib/formatters";
@@ -26,8 +26,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2, Upload } from "lucide-react";
 import { AxiosError } from "axios";
+import { downloadFile } from "@/lib/download";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface PrecioConProducto extends PrecioProducto {
   producto?: {
@@ -50,6 +58,14 @@ export default function PreciosPage() {
   const [familiaFilter, setFamiliaFilter] = useState("");
   const [familias, setFamilias] = useState<Familia[]>([]);
   const [isUpdatingBulk, setIsUpdatingBulk] = useState(false);
+
+  // Export/import state
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<{ updated: number; errors: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchPrecios = useCallback(async (lista: ListaPrecio) => {
     setIsLoading(true);
@@ -158,9 +174,108 @@ export default function PreciosPage() {
     }
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await downloadFile("/precios/export", "lista-precios.xlsx");
+    } catch {
+      toast({ title: "Error al descargar", variant: "destructive" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setIsImporting(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", importFile);
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+      const res = await fetch(`${baseUrl}/precios/import`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message ?? "Error al importar");
+      setImportResult(data);
+      toast({ title: `${data.updated} precios actualizados` });
+      fetchPrecios(activeTab);
+    } catch (error) {
+      toast({
+        title: "Error al importar",
+        description: error instanceof Error ? error.message : "Error inesperado",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Precios</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Precios</h1>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport} disabled={isExporting}>
+            {isExporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            Descargar Excel
+          </Button>
+          <Dialog open={importDialogOpen} onOpenChange={(open) => { setImportDialogOpen(open); if (!open) { setImportFile(null); setImportResult(null); } }}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                Importar Excel
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Importar Lista de Precios</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                <p className="text-sm text-muted-foreground">
+                  Subí el Excel con las columnas <strong>CODIGO</strong>, <strong>LISTA_1</strong>, <strong>LISTA_2</strong>, <strong>LISTA_3</strong>. Podés descargar la lista actual como base.
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".xlsx"
+                  className="hidden"
+                  onChange={(e) => setImportFile(e.target.files?.[0] ?? null)}
+                />
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" type="button" onClick={() => fileInputRef.current?.click()}>
+                    Seleccionar archivo
+                  </Button>
+                  {importFile && <span className="text-sm text-muted-foreground">{importFile.name}</span>}
+                </div>
+                {importResult && (
+                  <div className="rounded-md border p-3 text-sm space-y-1">
+                    <p className="font-medium text-green-600">{importResult.updated} precios actualizados</p>
+                    {importResult.errors.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="font-medium text-destructive">{importResult.errors.length} errores:</p>
+                        <ul className="list-disc list-inside text-muted-foreground space-y-0.5 max-h-32 overflow-y-auto">
+                          {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleImport} disabled={!importFile || isImporting}>
+                    {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Importar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
 
       <Card>
         <CardHeader>
