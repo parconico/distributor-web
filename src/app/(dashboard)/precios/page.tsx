@@ -192,8 +192,7 @@ export default function PreciosPage() {
     try {
       const formData = new FormData();
       formData.append("file", importFile);
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
-      const res = await fetch(`${baseUrl}/precios/import`, {
+      const res = await fetch(`/api/precios/import`, {
         method: "POST",
         credentials: "include",
         body: formData,
