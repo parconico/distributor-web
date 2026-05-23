@@ -54,7 +54,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RoleGate } from "@/components/shared/role-gate";
-import { Loader2, Trash2, Download, Pencil, X, Save } from "lucide-react";
+import { ExternalLink, Loader2, Trash2, Download, Pencil, X, Save } from "lucide-react";
+import Link from "next/link";
 import apiClient from "@/lib/api-client";
 import { AxiosError } from "axios";
 
@@ -280,8 +281,15 @@ export default function VentaDetailPage() {
     if (!venta) return;
     try {
       setIsActioning(true);
-      await post(`/ventas/${venta.id}/confirmar`);
-      toast({ title: "Venta confirmada" });
+      const result = await post<{ remitoGenerado?: { id: string; numero: number } }>(
+        `/ventas/${venta.id}/confirmar`
+      );
+      toast({
+        title: "Venta confirmada",
+        description: result.remitoGenerado
+          ? `Remito #${result.remitoGenerado.numero} generado`
+          : undefined,
+      });
       await fetchVenta();
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
@@ -454,6 +462,18 @@ export default function VentaDetailPage() {
                     Descargar Ticket
                   </Button>
                 </>
+              )}
+              {venta.remitos && venta.remitos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {venta.remitos.map((r) => (
+                    <Button key={r.id} variant="outline" size="sm" asChild>
+                      <Link href={`/remitos/${r.id}`}>
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        Remito #{r.numero}
+                      </Link>
+                    </Button>
+                  ))}
+                </div>
               )}
               <RoleGate allowedRoles={[Role.ADMIN]}>
                 <AlertDialog>

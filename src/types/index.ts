@@ -193,6 +193,7 @@ export interface Venta {
   items?: VentaItem[];
   ticketInterno?: TicketInterno;
   comprobantes?: Comprobante[];
+  remitos?: { id: string; numero: number; estado: EstadoRemito }[];
 }
 
 export interface VentaItem {
