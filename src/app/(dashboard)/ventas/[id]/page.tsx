@@ -281,15 +281,8 @@ export default function VentaDetailPage() {
     if (!venta) return;
     try {
       setIsActioning(true);
-      const result = await post<{ remitoGenerado?: { id: string; numero: number } }>(
-        `/ventas/${venta.id}/confirmar`
-      );
-      toast({
-        title: "Venta confirmada",
-        description: result.remitoGenerado
-          ? `Remito #${result.remitoGenerado.numero} generado`
-          : undefined,
-      });
+      await post(`/ventas/${venta.id}/confirmar`);
+      toast({ title: "Venta confirmada" });
       await fetchVenta();
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;

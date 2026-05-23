@@ -228,6 +228,17 @@ export default function NuevaVentaPage() {
         });
       }
 
+      const remito = await post<{ id: string }>("/remitos", {
+        clienteId,
+        ventaId: venta.id,
+      });
+      for (const item of items) {
+        await post(`/remitos/${remito.id}/items`, {
+          productoId: item.productoId,
+          cantidad: item.cantidad,
+        });
+      }
+
       toast({ title: "Venta creada correctamente" });
       router.push(`/ventas/${venta.id}`);
     } catch (error) {
