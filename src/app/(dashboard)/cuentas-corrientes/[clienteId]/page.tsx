@@ -56,6 +56,13 @@ export default function CuentaCorrienteDetailPage() {
   const [saldoFavorDescripcion, setSaldoFavorDescripcion] = useState("Saldo a favor");
   const [isSubmittingSaldo, setIsSubmittingSaldo] = useState(false);
 
+  // Devolución dialog state
+  const [devolucionOpen, setDevolucionOpen] = useState(false);
+  const [devolucionMonto, setDevolucionMonto] = useState<number>(0);
+  const [devolucionMetodoPago, setDevolucionMetodoPago] = useState<MetodoPago>(MetodoPago.EFECTIVO);
+  const [devolucionDescripcion, setDevolucionDescripcion] = useState("Devolución de saldo a favor");
+  const [isSubmittingDevolucion, setIsSubmittingDevolucion] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
       const [clienteData, movimientosData, saldoData] = await Promise.all([
@@ -152,6 +159,36 @@ export default function CuentaCorrienteDetailPage() {
       });
     } finally {
       setIsSubmittingSaldo(false);
+    }
+  };
+
+  const handleDevolucion = async () => {
+    if (devolucionMonto <= 0) {
+      toast({ title: "Error", description: "El monto debe ser mayor a 0", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsSubmittingDevolucion(true);
+      await post("/cuentas-corrientes/devolucion", {
+        clienteId,
+        monto: devolucionMonto,
+        metodoPago: devolucionMetodoPago,
+        descripcion: devolucionDescripcion || "Devolución de saldo a favor",
+      });
+      toast({ title: "Devolución registrada correctamente" });
+      setDevolucionOpen(false);
+      setDevolucionMonto(0);
+      setDevolucionDescripcion("Devolución de saldo a favor");
+      await fetchData();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description: axiosError.response?.data?.message ?? "No se pudo registrar la devolución",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingDevolucion(false);
     }
   };
 
@@ -366,6 +403,66 @@ export default function CuentaCorrienteDetailPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          {saldo < 0 && (
+            <Dialog open={devolucionOpen} onOpenChange={setDevolucionOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">Devolver Saldo</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Devolver Saldo a Favor</DialogTitle>
+                  <DialogDescription>
+                    Saldo disponible: {formatCurrency(Math.abs(saldo))}. Registrá la devolución entregada a {cliente.razonSocial}.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Monto a devolver</Label>
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={devolucionMonto || ""}
+                      onChange={(e) => setDevolucionMonto(Number(e.target.value))}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Método de pago</Label>
+                    <Select
+                      value={devolucionMetodoPago}
+                      onValueChange={(v) => setDevolucionMetodoPago(v as MetodoPago)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
+                        <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descripción (opcional)</Label>
+                    <Input
+                      value={devolucionDescripcion}
+                      onChange={(e) => setDevolucionDescripcion(e.target.value)}
+                      placeholder="Devolución de saldo a favor"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDevolucionOpen(false)} disabled={isSubmittingDevolucion}>
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleDevolucion} disabled={isSubmittingDevolucion || devolucionMonto <= 0}>
+                    {isSubmittingDevolucion && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirmar devolución
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
           <Button variant="outline" onClick={() => router.push("/cuentas-corrientes")}>
             Volver
           </Button>
