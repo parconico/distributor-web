@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
-import { get, post } from "@/lib/api-client";
-import { Cliente, MetodoPago, MovimientoCuentaCorriente, PaginatedResponse, TipoMovimientoCuenta } from "@/types";
+import { get, post, patch, del } from "@/lib/api-client";
+import { Cliente, MetodoPago, MovimientoCuentaCorriente, PaginatedResponse, Role, TipoMovimientoCuenta } from "@/types";
 import { formatCurrency, formatMetodoPago, formatTipoMovimientoCuenta } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/tables/data-table";
@@ -29,8 +29,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
+import { RoleGate } from "@/components/shared/role-gate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function CuentaCorrienteDetailPage() {
   const params = useParams();
@@ -162,6 +174,59 @@ export default function CuentaCorrienteDetailPage() {
     }
   };
 
+  // Edit movimiento state
+  const [editMovimiento, setEditMovimiento] = useState<MovimientoCuentaCorriente | null>(null);
+  const [editMonto, setEditMonto] = useState<number>(0);
+  const [editMetodoPago, setEditMetodoPago] = useState<MetodoPago | "">(MetodoPago.EFECTIVO);
+  const [editDescripcion, setEditDescripcion] = useState("");
+  const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+
+  const openEdit = (m: MovimientoCuentaCorriente) => {
+    setEditMovimiento(m);
+    setEditMonto(m.monto);
+    setEditMetodoPago(m.metodoPago ?? "");
+    setEditDescripcion(m.descripcion);
+  };
+
+  const handleEdit = async () => {
+    if (!editMovimiento || editMonto <= 0) return;
+    try {
+      setIsSubmittingEdit(true);
+      await patch(`/cuentas-corrientes/movimientos/${editMovimiento.id}`, {
+        monto: editMonto,
+        descripcion: editDescripcion,
+        ...(editMetodoPago ? { metodoPago: editMetodoPago } : { metodoPago: null }),
+      });
+      toast({ title: "Movimiento actualizado" });
+      setEditMovimiento(null);
+      await fetchData();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description: axiosError.response?.data?.message ?? "No se pudo actualizar",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingEdit(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await del(`/cuentas-corrientes/movimientos/${id}`);
+      toast({ title: "Movimiento eliminado" });
+      await fetchData();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description: axiosError.response?.data?.message ?? "No se pudo eliminar",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDevolucion = async () => {
     if (devolucionMonto <= 0) {
       toast({ title: "Error", description: "El monto debe ser mayor a 0", variant: "destructive" });
@@ -239,6 +304,43 @@ export default function CuentaCorrienteDetailPage() {
     {
       accessorKey: "descripcion",
       header: "Descripción",
+    },
+    {
+      id: "acciones",
+      header: "",
+      cell: ({ row }) => {
+        const m = row.original;
+        return (
+          <RoleGate allowedRoles={[Role.ADMIN]}>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(m)}>
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Eliminar movimiento</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Se eliminará el movimiento y se recalcularán los saldos. Esta acción no se puede deshacer.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDelete(m.id)}>
+                      Eliminar
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </RoleGate>
+        );
+      },
     },
   ];
 
@@ -520,6 +622,62 @@ export default function CuentaCorrienteDetailPage() {
           searchPlaceholder="Buscar movimientos..."
         />
       </div>
+
+      {/* Edit dialog — controlled outside the table */}
+      <Dialog open={!!editMovimiento} onOpenChange={(open) => { if (!open) setEditMovimiento(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar movimiento</DialogTitle>
+            <DialogDescription>
+              Modificá los datos del movimiento. Los saldos se recalcularán automáticamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Monto</Label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={editMonto || ""}
+                onChange={(e) => setEditMonto(Number(e.target.value))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Método de pago (opcional)</Label>
+              <Select
+                value={editMetodoPago}
+                onValueChange={(v) => setEditMetodoPago(v as MetodoPago)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sin método" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin método</SelectItem>
+                  <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
+                  <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Descripción</Label>
+              <Input
+                value={editDescripcion}
+                onChange={(e) => setEditDescripcion(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditMovimiento(null)} disabled={isSubmittingEdit}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEdit} disabled={isSubmittingEdit || editMonto <= 0}>
+              {isSubmittingEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
