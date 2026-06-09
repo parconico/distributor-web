@@ -177,14 +177,14 @@ export default function CuentaCorrienteDetailPage() {
   // Edit movimiento state
   const [editMovimiento, setEditMovimiento] = useState<MovimientoCuentaCorriente | null>(null);
   const [editMonto, setEditMonto] = useState<number>(0);
-  const [editMetodoPago, setEditMetodoPago] = useState<MetodoPago | "">(MetodoPago.EFECTIVO);
+  const [editMetodoPago, setEditMetodoPago] = useState<MetodoPago | "NONE">(MetodoPago.EFECTIVO);
   const [editDescripcion, setEditDescripcion] = useState("");
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const openEdit = (m: MovimientoCuentaCorriente) => {
     setEditMovimiento(m);
     setEditMonto(m.monto);
-    setEditMetodoPago(m.metodoPago ?? "");
+    setEditMetodoPago(m.metodoPago ?? "NONE");
     setEditDescripcion(m.descripcion);
   };
 
@@ -195,7 +195,7 @@ export default function CuentaCorrienteDetailPage() {
       await patch(`/cuentas-corrientes/movimientos/${editMovimiento.id}`, {
         monto: editMonto,
         descripcion: editDescripcion,
-        ...(editMetodoPago ? { metodoPago: editMetodoPago } : { metodoPago: null }),
+        metodoPago: editMetodoPago === "NONE" ? null : editMetodoPago,
       });
       toast({ title: "Movimiento actualizado" });
       setEditMovimiento(null);
@@ -653,7 +653,7 @@ export default function CuentaCorrienteDetailPage() {
                   <SelectValue placeholder="Sin método" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin método</SelectItem>
+                  <SelectItem value="NONE">Sin método</SelectItem>
                   <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
                   <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
                 </SelectContent>
