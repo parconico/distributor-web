@@ -192,20 +192,27 @@ export default function PreciosPage() {
     try {
       const formData = new FormData();
       formData.append("file", importFile);
-      const res = await fetch(`/api/precios/import`, {
-        method: "POST",
-        credentials: "include",
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message ?? "Error al importar");
+      // El Content-Type default del apiClient es application/json, y con ese header
+      // axios serializa el FormData a JSON en vez de mandarlo como multipart.
+      // Al pasar multipart/form-data, el browser lo reemplaza agregando el boundary.
+      const data = await post<{ updated: number; errors: string[] }>(
+        "/precios/import",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
       setImportResult(data);
       toast({ title: `${data.updated} precios actualizados` });
       fetchPrecios(activeTab);
     } catch (error) {
+      const message =
+        error instanceof AxiosError
+          ? (error.response?.data as { message?: string })?.message ?? error.message
+          : error instanceof Error
+            ? error.message
+            : "Error inesperado";
       toast({
         title: "Error al importar",
-        description: error instanceof Error ? error.message : "Error inesperado",
+        description: message,
         variant: "destructive",
       });
     } finally {

@@ -1,9 +1,8 @@
+import apiClient from "./api-client";
+
 export async function downloadFile(url: string, filename: string) {
-  const response = await fetch(`/api${url}`, {
-    credentials: 'include',
-  });
-  const blob = await response.blob();
-  const downloadUrl = window.URL.createObjectURL(blob);
+  const response = await apiClient.get<Blob>(url, { responseType: "blob" });
+  const downloadUrl = window.URL.createObjectURL(response.data);
   const a = document.createElement('a');
   a.href = downloadUrl;
   a.download = filename;

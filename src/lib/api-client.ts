@@ -30,6 +30,14 @@ const processQueue = (error: unknown | null) => {
   failedQueue = [];
 };
 
+// Sesion vencida: no hay forma de recuperarla, mandamos al login.
+// El guard de pathname evita un loop de recargas si ya estamos ahi.
+const redirectToLogin = () => {
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+};
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -37,7 +45,10 @@ apiClient.interceptors.response.use(
       _retry?: boolean;
     };
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Un 401 del propio login son credenciales incorrectas: no hay nada que refrescar.
+    const isLoginRequest = originalRequest?.url === "/auth/login";
+
+    if (error.response?.status === 401 && !originalRequest?._retry && !isLoginRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -55,6 +66,7 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);
+        redirectToLogin();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
