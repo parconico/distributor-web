@@ -45,6 +45,19 @@ interface PrecioConProducto extends PrecioProducto {
   };
 }
 
+// Este endpoint devuelve el total dentro de "meta", no aplanado como PaginatedResponse.
+interface PaginatedPrecios {
+  data: PrecioConProducto[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+const PAGE_SIZE = 20;
+
 export default function PreciosPage() {
   const [activeTab, setActiveTab] = useState<ListaPrecio>(ListaPrecio.LISTA_1);
   const [precios, setPrecios] = useState<PrecioConProducto[]>([]);
@@ -52,6 +65,14 @@ export default function PreciosPage() {
   const [editingPrices, setEditingPrices] = useState<Record<string, string>>(
     {}
   );
+
+  // Busqueda y paginado: los resuelve la API, asi que la tabla nunca carga
+  // mas de PAGE_SIZE filas por vez.
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Bulk update state
   const [porcentaje, setPorcentaje] = useState("");
@@ -67,12 +88,22 @@ export default function PreciosPage() {
   const [importResult, setImportResult] = useState<{ updated: number; errors: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchPrecios = useCallback(async (lista: ListaPrecio) => {
+  const fetchPrecios = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await get<{ data: PrecioConProducto[] }>(`/precios/lista/${lista}`);
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      });
+      if (debouncedSearch) params.set("search", debouncedSearch);
+
+      const response = await get<PaginatedPrecios>(
+        `/precios/lista/${activeTab}?${params.toString()}`
+      );
       const data = response.data;
       setPrecios(data);
+      setTotal(response.meta.total);
+      setTotalPages(response.meta.totalPages);
       const initialPrices: Record<string, string> = {};
       data.forEach((p) => {
         initialPrices[p.productoId] = String(p.precioNeto);
@@ -87,11 +118,21 @@ export default function PreciosPage() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeTab, page, debouncedSearch]);
 
   useEffect(() => {
-    fetchPrecios(activeTab);
-  }, [activeTab, fetchPrecios]);
+    fetchPrecios();
+  }, [fetchPrecios]);
+
+  // Al tipear volvemos a la primera pagina: si estabas en la 3 y filtras,
+  // el resultado puede tener una sola pagina.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [search]);
 
   useEffect(() => {
     const loadFamilias = async () => {
@@ -119,7 +160,7 @@ export default function PreciosPage() {
         precioNeto: newPrice,
       });
       toast({ title: "Precio actualizado" });
-      fetchPrecios(activeTab);
+      fetchPrecios();
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
       toast({
@@ -159,7 +200,7 @@ export default function PreciosPage() {
       toast({ title: "Precios actualizados correctamente" });
       setPorcentaje("");
       setFamiliaFilter("");
-      fetchPrecios(activeTab);
+      fetchPrecios();
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
       toast({
@@ -202,7 +243,7 @@ export default function PreciosPage() {
       );
       setImportResult(data);
       toast({ title: `${data.updated} precios actualizados` });
-      fetchPrecios(activeTab);
+      fetchPrecios();
     } catch (error) {
       const message =
         error instanceof AxiosError
@@ -333,15 +374,26 @@ export default function PreciosPage() {
 
       <Tabs
         value={activeTab}
-        onValueChange={(val) => setActiveTab(val as ListaPrecio)}
+        onValueChange={(val) => {
+          setActiveTab(val as ListaPrecio);
+          setPage(1);
+        }}
       >
-        <TabsList>
-          {Object.values(ListaPrecio).map((lp) => (
-            <TabsTrigger key={lp} value={lp}>
-              {formatListaPrecio(lp)}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList>
+            {Object.values(ListaPrecio).map((lp) => (
+              <TabsTrigger key={lp} value={lp}>
+                {formatListaPrecio(lp)}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <Input
+            placeholder="Buscar por código o nombre..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full sm:max-w-sm"
+          />
+        </div>
 
         {Object.values(ListaPrecio).map((lp) => (
           <TabsContent key={lp} value={lp}>
@@ -363,7 +415,9 @@ export default function PreciosPage() {
                     {precios.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={3} className="h-24 text-center">
-                          Sin precios para esta lista
+                          {debouncedSearch
+                            ? `Sin resultados para "${debouncedSearch}"`
+                            : "Sin precios para esta lista"}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -398,6 +452,39 @@ export default function PreciosPage() {
                     )}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+
+            {!isLoading && total > 0 && (
+              <div className="mt-4 flex flex-col gap-2 px-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {total} producto(s) &middot; mostrando{" "}
+                  {(page - 1) * PAGE_SIZE + 1}-
+                  {Math.min(page * PAGE_SIZE, total)}
+                </div>
+                <div className="flex items-center justify-between gap-2 sm:justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page <= 1}
+                  >
+                    Anterior
+                  </Button>
+                  <div className="text-xs text-muted-foreground sm:text-sm">
+                    Pág. {page}/{totalPages}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={page >= totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
               </div>
             )}
           </TabsContent>
