@@ -30,8 +30,31 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Eye, Loader2, Plus, Trash2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Download, Eye, Loader2, Plus, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
+import { downloadFile } from "@/lib/download";
+
+// Formato que espera <input type="date">, armado con la fecha local: toISOString
+// devuelve UTC y en Argentina adelantaria un dia a partir de las 21hs.
+const isoDate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+
+const primerDiaDelMes = () => {
+  const hoy = new Date();
+  return isoDate(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+};
 
 export default function VentasPage() {
   const router = useRouter();
@@ -39,6 +62,12 @@ export default function VentasPage() {
   const [filteredVentas, setFilteredVentas] = useState<Venta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
+
+  // Descarga del detalle
+  const [exportOpen, setExportOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [fechaDesde, setFechaDesde] = useState(primerDiaDelMes);
+  const [fechaHasta, setFechaHasta] = useState(() => isoDate(new Date()));
 
   const fetchVentas = async () => {
     try {
@@ -85,6 +114,33 @@ export default function VentasPage() {
       setFilteredVentas(ventas.filter((v) => v.estado === estadoFilter));
     }
   }, [estadoFilter, ventas]);
+
+  const handleExportDetalle = async () => {
+    if (fechaDesde > fechaHasta) {
+      toast({
+        title: "Rango inválido",
+        description: "La fecha desde no puede ser posterior a la fecha hasta",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsExporting(true);
+    try {
+      await downloadFile(
+        `/reportes/ventas/detalle/excel?fechaDesde=${fechaDesde}&fechaHasta=${fechaHasta}`,
+        `ventas-detalle-${fechaDesde}-${fechaHasta}.xlsx`
+      );
+      setExportOpen(false);
+    } catch {
+      toast({
+        title: "Error al descargar",
+        description: "No se pudo generar el detalle de ventas",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const columns: ColumnDef<Venta>[] = [
     {
@@ -196,14 +252,74 @@ export default function VentasPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Ventas</h1>
-        <RoleGate allowedRoles={[Role.ADMIN, Role.VENDEDOR]}>
-          <Button asChild>
-            <Link href="/ventas/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva Venta
-            </Link>
-          </Button>
-        </RoleGate>
+        <div className="flex flex-wrap gap-2">
+          {/* El endpoint de reportes solo lo pueden usar ADMIN y CONTADOR */}
+          <RoleGate allowedRoles={[Role.ADMIN, Role.CONTADOR]}>
+            <Dialog open={exportOpen} onOpenChange={setExportOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Download className="mr-2 h-4 w-4" />
+                  Descargar Detalle
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Descargar detalle de ventas</DialogTitle>
+                  <DialogDescription>
+                    Genera un Excel con dos hojas: una fila por venta con
+                    totales y forma de pago, y el detalle de cada producto
+                    vendido. Incluye las ventas confirmadas y facturadas del
+                    período.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="flex flex-col gap-4 sm:flex-row">
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="fecha-desde">Desde</Label>
+                      <Input
+                        id="fecha-desde"
+                        type="date"
+                        value={fechaDesde}
+                        onChange={(e) => setFechaDesde(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <Label htmlFor="fecha-hasta">Hasta</Label>
+                      <Input
+                        id="fecha-hasta"
+                        type="date"
+                        value={fechaHasta}
+                        onChange={(e) => setFechaHasta(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setExportOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleExportDetalle} disabled={isExporting}>
+                      {isExporting && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      )}
+                      Descargar
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </RoleGate>
+          <RoleGate allowedRoles={[Role.ADMIN, Role.VENDEDOR]}>
+            <Button asChild>
+              <Link href="/ventas/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva Venta
+              </Link>
+            </Button>
+          </RoleGate>
+        </div>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
         <Select value={estadoFilter} onValueChange={setEstadoFilter}>
