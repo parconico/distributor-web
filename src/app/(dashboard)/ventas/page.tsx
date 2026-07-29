@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
 import { get, del } from "@/lib/api-client";
-import { Venta, PaginatedResponse, EstadoVenta, Role } from "@/types";
+import { Venta, EstadoVenta, Role } from "@/types";
 import { formatCurrency, formatListaPrecio, formatEstadoVenta, estadoVentaVariant, formatMetodoPago } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
 import { DataTable } from "@/components/tables/data-table";
@@ -56,12 +56,33 @@ const primerDiaDelMes = () => {
   return isoDate(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
 };
 
+// El endpoint devuelve el total dentro de "meta", no aplanado como PaginatedResponse.
+interface PaginatedVentas {
+  data: Venta[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+const PAGE_SIZE = 20;
+
 export default function VentasPage() {
   const router = useRouter();
   const [ventas, setVentas] = useState<Venta[]>([]);
-  const [filteredVentas, setFilteredVentas] = useState<Venta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
+
+  // Filtro, busqueda y paginado los resuelve la API. Antes la pantalla pedia
+  // "?page=1&limit=100" y filtraba en el browser, asi que cualquier venta fuera
+  // de las 100 mas recientes era inalcanzable.
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Descarga del detalle
   const [exportOpen, setExportOpen] = useState(false);
@@ -69,13 +90,22 @@ export default function VentasPage() {
   const [fechaDesde, setFechaDesde] = useState(primerDiaDelMes);
   const [fechaHasta, setFechaHasta] = useState(() => isoDate(new Date()));
 
-  const fetchVentas = async () => {
+  const fetchVentas = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const response = await get<PaginatedResponse<Venta>>(
-        "/ventas?page=1&limit=100"
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(PAGE_SIZE),
+      });
+      if (estadoFilter !== "all") params.set("estado", estadoFilter);
+      if (debouncedSearch) params.set("search", debouncedSearch);
+
+      const response = await get<PaginatedVentas>(
+        `/ventas?${params.toString()}`
       );
       setVentas(response.data);
-      setFilteredVentas(response.data);
+      setTotal(response.meta.total);
+      setTotalPages(response.meta.totalPages);
     } catch {
       toast({
         title: "Error",
@@ -85,11 +115,28 @@ export default function VentasPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page, estadoFilter, debouncedSearch]);
 
   useEffect(() => {
     fetchVentas();
-  }, []);
+  }, [fetchVentas]);
+
+  // Al tipear volvemos a la primera pagina: el resultado filtrado puede tener
+  // menos paginas que el listado completo.
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  // Borrar la ultima venta de la ultima pagina nos dejaria fuera de rango.
+  useEffect(() => {
+    if (!isLoading && totalPages > 0 && page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [isLoading, page, totalPages]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -106,14 +153,6 @@ export default function VentasPage() {
       });
     }
   };
-
-  useEffect(() => {
-    if (estadoFilter === "all") {
-      setFilteredVentas(ventas);
-    } else {
-      setFilteredVentas(ventas.filter((v) => v.estado === estadoFilter));
-    }
-  }, [estadoFilter, ventas]);
 
   const handleExportDetalle = async () => {
     if (fechaDesde > fechaHasta) {
@@ -240,14 +279,6 @@ export default function VentasPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -322,7 +353,13 @@ export default function VentasPage() {
         </div>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+        <Select
+          value={estadoFilter}
+          onValueChange={(val) => {
+            setEstadoFilter(val);
+            setPage(1);
+          }}
+        >
           <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Filtrar por estado" />
           </SelectTrigger>
@@ -335,13 +372,51 @@ export default function VentasPage() {
             ))}
           </SelectContent>
         </Select>
+        <Input
+          placeholder="Buscar por número o cliente..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full sm:max-w-sm"
+        />
       </div>
-      <DataTable
-        columns={columns}
-        data={filteredVentas}
-        searchKey="numero"
-        searchPlaceholder="Buscar ventas..."
-      />
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      ) : (
+        <DataTable columns={columns} data={ventas} pagination={false} />
+      )}
+
+      {!isLoading && total > 0 && (
+        <div className="flex flex-col gap-2 px-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            {total} venta(s) &middot; mostrando {(page - 1) * PAGE_SIZE + 1}-
+            {Math.min(page * PAGE_SIZE, total)}
+          </div>
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              Anterior
+            </Button>
+            <div className="text-xs text-muted-foreground sm:text-sm">
+              Pág. {page}/{totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
