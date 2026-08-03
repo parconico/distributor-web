@@ -505,66 +505,69 @@ export default function CuentaCorrienteDetailPage() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          {saldo < 0 && (
-            <Dialog open={devolucionOpen} onOpenChange={setDevolucionOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">Devolver Saldo</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Devolver Saldo a Favor</DialogTitle>
-                  <DialogDescription>
-                    Saldo disponible: {formatCurrency(Math.abs(saldo))}. Registrá la devolución entregada a {cliente.razonSocial}.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Monto a devolver</Label>
-                    <Input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={devolucionMonto || ""}
-                      onChange={(e) => setDevolucionMonto(Number(e.target.value))}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Método de pago</Label>
-                    <Select
-                      value={devolucionMetodoPago}
-                      onValueChange={(v) => setDevolucionMetodoPago(v as MetodoPago)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
-                        <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Descripción (opcional)</Label>
-                    <Input
-                      value={devolucionDescripcion}
-                      onChange={(e) => setDevolucionDescripcion(e.target.value)}
-                      placeholder="Devolución de saldo a favor"
-                    />
-                  </div>
+          <Dialog open={devolucionOpen} onOpenChange={setDevolucionOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">Devolver Saldo</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Devolver Saldo a Favor</DialogTitle>
+                {/* El movimiento siempre se registra como débito. Sin saldo a favor
+                    que lo cubra el resultado es más deuda, así que lo decimos en
+                    lugar de hablar de un "disponible" que no existe. */}
+                <DialogDescription>
+                  {saldo < 0
+                    ? `Saldo a favor disponible: ${formatCurrency(Math.abs(saldo))}. Registrá la devolución entregada a ${cliente.razonSocial}.`
+                    : `${cliente.razonSocial} no tiene saldo a favor. El movimiento se registra como débito y aumenta su deuda.`}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label>Monto a devolver</Label>
+                  <Input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={devolucionMonto || ""}
+                    onChange={(e) => setDevolucionMonto(Number(e.target.value))}
+                    placeholder="0.00"
+                  />
                 </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setDevolucionOpen(false)} disabled={isSubmittingDevolucion}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleDevolucion} disabled={isSubmittingDevolucion || devolucionMonto <= 0}>
-                    {isSubmittingDevolucion && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Confirmar devolución
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+                <div className="space-y-2">
+                  <Label>Método de pago</Label>
+                  <Select
+                    value={devolucionMetodoPago}
+                    onValueChange={(v) => setDevolucionMetodoPago(v as MetodoPago)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={MetodoPago.EFECTIVO}>Efectivo</SelectItem>
+                      <SelectItem value={MetodoPago.TRANSFERENCIA}>Transferencia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Descripción (opcional)</Label>
+                  <Input
+                    value={devolucionDescripcion}
+                    onChange={(e) => setDevolucionDescripcion(e.target.value)}
+                    placeholder="Devolución de saldo a favor"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDevolucionOpen(false)} disabled={isSubmittingDevolucion}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleDevolucion} disabled={isSubmittingDevolucion || devolucionMonto <= 0}>
+                  {isSubmittingDevolucion && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmar devolución
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Button variant="outline" onClick={() => router.push("/cuentas-corrientes")}>
             Volver
           </Button>
