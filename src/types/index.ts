@@ -179,6 +179,7 @@ export interface Venta {
   tipoVenta: TipoVenta;
   conIva: boolean;
   descuentoTotal: number;
+  descuentoMonto: number;
   subtotal: number;
   totalIva: number;
   totalDescuento: number;
@@ -204,6 +205,7 @@ export interface VentaItem {
   cantidad: number;
   precioUnitario: number;
   descuento: number;
+  descuentoMonto: number;
   alicuotaIva: number;
   subtotal: number;
   montoIva: number;

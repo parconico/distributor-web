@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api-client";
 import { Cliente, MetodoPago, Producto, PaginatedResponse, ListaPrecio } from "@/types";
 import { formatCurrency, formatListaPrecio, formatMetodoPago } from "@/lib/formatters";
-import { calcularLineaVenta } from "@/lib/iva-calculator";
+import { aplicarDescuento, calcularLineaVenta } from "@/lib/iva-calculator";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,12 +31,18 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
 
+type ModoDescuento = "PCT" | "MONTO";
+
 interface LocalItem {
   productoId: string;
   producto: Producto;
   cantidad: number;
   precioUnitario: number;
   descuento: number;
+  descuentoMonto: number;
+  // Cual de los dos campos esta activo. Lo guardamos aparte del valor para que
+  // el modo elegido no se pierda cuando el descuento vuelve a 0.
+  descuentoModo: ModoDescuento;
   alicuotaIva: number;
   subtotal: number;
   montoIva: number;
@@ -56,6 +62,8 @@ export default function NuevaVentaPage() {
   const [tipoVenta, setTipoVenta] = useState<"EN_BLANCO" | "EN_NEGRO">("EN_BLANCO");
   const [conIva, setConIva] = useState(true);
   const [descuentoGeneral, setDescuentoGeneral] = useState(0);
+  const [descuentoGeneralMonto, setDescuentoGeneralMonto] = useState(0);
+  const [descuentoGeneralModo, setDescuentoGeneralModo] = useState<ModoDescuento>("PCT");
   const [pagos, setPagos] = useState<{ metodoPago: MetodoPago; monto: number }[]>([
     { metodoPago: MetodoPago.CUENTA_CORRIENTE, monto: 0 },
   ]);
@@ -141,7 +149,7 @@ export default function NuevaVentaPage() {
     }
 
     const precioUnitario = getPrecioForLista(selectedProducto);
-    const linea = calcularLineaVenta(precioUnitario, cantidad, selectedProducto.alicuotaIva, conIva, 0);
+    const linea = calcularLineaVenta(precioUnitario, cantidad, selectedProducto.alicuotaIva, conIva, 0, 0);
 
     setItems((prev) => [
       ...prev,
@@ -151,6 +159,8 @@ export default function NuevaVentaPage() {
         cantidad,
         precioUnitario,
         descuento: 0,
+        descuentoMonto: 0,
+        descuentoModo: "PCT",
         alicuotaIva: selectedProducto.alicuotaIva,
         ...linea,
       },
@@ -165,33 +175,77 @@ export default function NuevaVentaPage() {
     setItems((prev) => prev.filter((i) => i.productoId !== productoId));
   };
 
-  const recalcItem = (item: LocalItem, newCantidad: number, newDescuento: number): LocalItem => {
-    const linea = calcularLineaVenta(item.precioUnitario, newCantidad, item.alicuotaIva, conIva, newDescuento);
-    return { ...item, cantidad: newCantidad, descuento: newDescuento, ...linea };
+  const recalcItem = (
+    item: LocalItem,
+    newCantidad: number,
+    newDescuento: number,
+    newDescuentoMonto: number
+  ): LocalItem => {
+    const linea = calcularLineaVenta(
+      item.precioUnitario,
+      newCantidad,
+      item.alicuotaIva,
+      conIva,
+      newDescuento,
+      newDescuentoMonto
+    );
+    return {
+      ...item,
+      cantidad: newCantidad,
+      descuento: newDescuento,
+      descuentoMonto: newDescuentoMonto,
+      ...linea,
+    };
   };
 
   const handleUpdateCantidad = (productoId: string, newCantidad: number) => {
     if (newCantidad <= 0) return;
-    setItems((prev) => prev.map((item) => item.productoId !== productoId ? item : recalcItem(item, newCantidad, item.descuento)));
+    setItems((prev) => prev.map((item) => item.productoId !== productoId ? item : recalcItem(item, newCantidad, item.descuento, item.descuentoMonto)));
   };
 
-  const handleUpdateDescuento = (productoId: string, newDescuento: number) => {
-    if (newDescuento < 0 || newDescuento > 100) return;
-    setItems((prev) => prev.map((item) => item.productoId !== productoId ? item : recalcItem(item, item.cantidad, newDescuento)));
+  const handleUpdateDescuento = (productoId: string, valor: number) => {
+    if (valor < 0) return;
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.productoId !== productoId) return item;
+        if (item.descuentoModo === "PCT") {
+          if (valor > 100) return item;
+          return recalcItem(item, item.cantidad, valor, 0);
+        }
+        return recalcItem(item, item.cantidad, 0, valor);
+      })
+    );
+  };
+
+  // Cambiar de % a $ (o al reves) resetea el valor: los numeros no son
+  // equivalentes entre modos y arrastrarlos daria un descuento inesperado.
+  const handleToggleModoDescuento = (productoId: string) => {
+    setItems((prev) =>
+      prev.map((item) => {
+        if (item.productoId !== productoId) return item;
+        const nuevoModo: ModoDescuento = item.descuentoModo === "PCT" ? "MONTO" : "PCT";
+        return { ...recalcItem(item, item.cantidad, 0, 0), descuentoModo: nuevoModo };
+      })
+    );
   };
 
   const totals = useMemo(() => {
     const subtotalItems = items.reduce((acc, i) => acc + i.subtotal, 0);
     const totalIvaItems = items.reduce((acc, i) => acc + i.montoIva, 0);
     const totalItems = items.reduce((acc, i) => acc + i.total, 0);
-    const factor = 1 - descuentoGeneral / 100;
+    // El descuento en pesos se traduce al factor equivalente para que el IVA
+    // baje en la misma proporcion que el neto.
+    const pct = descuentoGeneralModo === "PCT" ? descuentoGeneral : 0;
+    const monto = descuentoGeneralModo === "MONTO" ? descuentoGeneralMonto : 0;
+    const totalConDescuento = aplicarDescuento(totalItems, pct, monto);
+    const factor = totalItems > 0 ? totalConDescuento / totalItems : 1;
     return {
       subtotal: Math.round(subtotalItems * factor * 100) / 100,
       totalIva: Math.round(totalIvaItems * factor * 100) / 100,
       totalDescuento: Math.round((totalItems - totalItems * factor) * 100) / 100,
       total: Math.round(totalItems * factor * 100) / 100,
     };
-  }, [items, descuentoGeneral]);
+  }, [items, descuentoGeneral, descuentoGeneralMonto, descuentoGeneralModo]);
 
   const handleSave = async () => {
     if (!clienteId) {
@@ -214,7 +268,8 @@ export default function NuevaVentaPage() {
         listaPrecio,
         tipoVenta,
         conIva,
-        descuentoTotal: descuentoGeneral,
+        descuentoTotal: descuentoGeneralModo === "PCT" ? descuentoGeneral : 0,
+        descuentoMonto: descuentoGeneralModo === "MONTO" ? descuentoGeneralMonto : 0,
         pagos,
         diasCredito: pagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) ? diasCredito : undefined,
         observaciones: observaciones || undefined,
@@ -225,6 +280,7 @@ export default function NuevaVentaPage() {
           productoId: item.productoId,
           cantidad: item.cantidad,
           descuento: item.descuento,
+          descuentoMonto: item.descuentoMonto,
         });
       }
 
@@ -338,15 +394,41 @@ export default function NuevaVentaPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Dto. General %</Label>
-              <Input
-                type="number"
-                min="0"
-                max="100"
-                step="0.5"
-                value={descuentoGeneral}
-                onChange={(e) => setDescuentoGeneral(Number(e.target.value))}
-              />
+              <Label>Dto. General</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-12 shrink-0 font-semibold"
+                  onClick={() => {
+                    // Cambiar de modo resetea el valor: 20% y $20 no son lo mismo.
+                    setDescuentoGeneralModo((m) => (m === "PCT" ? "MONTO" : "PCT"));
+                    setDescuentoGeneral(0);
+                    setDescuentoGeneralMonto(0);
+                  }}
+                  title="Alternar entre porcentaje y pesos"
+                >
+                  {descuentoGeneralModo === "PCT" ? "%" : "$"}
+                </Button>
+                {descuentoGeneralModo === "PCT" ? (
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={descuentoGeneral}
+                    onChange={(e) => setDescuentoGeneral(Number(e.target.value))}
+                  />
+                ) : (
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={descuentoGeneralMonto}
+                    onChange={(e) => setDescuentoGeneralMonto(Number(e.target.value))}
+                  />
+                )}
+              </div>
             </div>
 
             <div className="space-y-3 lg:col-span-3">
@@ -513,15 +595,28 @@ export default function NuevaVentaPage() {
                       </TableCell>
                       <TableCell>{formatCurrency(item.precioUnitario)}</TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.5"
-                          value={item.descuento}
-                          onChange={(e) => handleUpdateDescuento(item.productoId, Number(e.target.value))}
-                          className="w-16"
-                        />
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-9 shrink-0 px-0 font-semibold"
+                            onClick={() => handleToggleModoDescuento(item.productoId)}
+                            title="Alternar entre porcentaje y pesos"
+                          >
+                            {item.descuentoModo === "PCT" ? "%" : "$"}
+                          </Button>
+                          <Input
+                            type="number"
+                            min="0"
+                            {...(item.descuentoModo === "PCT"
+                              ? { max: 100, step: 0.5 }
+                              : { step: 0.01 })}
+                            value={item.descuentoModo === "PCT" ? item.descuento : item.descuentoMonto}
+                            onChange={(e) => handleUpdateDescuento(item.productoId, Number(e.target.value))}
+                            className="w-20"
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>{item.alicuotaIva}%</TableCell>
                       <TableCell>{formatCurrency(item.subtotal)}</TableCell>
@@ -564,7 +659,13 @@ export default function NuevaVentaPage() {
               </div>
               {totals.totalDescuento > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Descuento ({descuentoGeneral}%):</span>
+                  <span>
+                    Descuento
+                    {descuentoGeneralModo === "PCT" && descuentoGeneral > 0
+                      ? ` (${descuentoGeneral}%)`
+                      : ""}
+                    :
+                  </span>
                   <span className="font-medium">-{formatCurrency(totals.totalDescuento)}</span>
                 </div>
               )}

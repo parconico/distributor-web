@@ -59,6 +59,8 @@ import Link from "next/link";
 import apiClient from "@/lib/api-client";
 import { AxiosError } from "axios";
 
+type ModoDescuento = "PCT" | "MONTO";
+
 export default function VentaDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -76,6 +78,8 @@ export default function VentaDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editTipoVenta, setEditTipoVenta] = useState<TipoVenta>(TipoVenta.EN_BLANCO);
   const [editDescuento, setEditDescuento] = useState(0);
+  const [editDescuentoMonto, setEditDescuentoMonto] = useState(0);
+  const [editDescuentoModo, setEditDescuentoModo] = useState<ModoDescuento>("PCT");
   const [editObservaciones, setEditObservaciones] = useState("");
   const [editDiasCredito, setEditDiasCredito] = useState(30);
   const [editPagos, setEditPagos] = useState<Record<MetodoPago, { selected: boolean; monto: number }>>({
@@ -88,6 +92,8 @@ export default function VentaDetailPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editItemCantidad, setEditItemCantidad] = useState(0);
   const [editItemDescuento, setEditItemDescuento] = useState(0);
+  const [editItemDescuentoMonto, setEditItemDescuentoMonto] = useState(0);
+  const [editItemDescuentoModo, setEditItemDescuentoModo] = useState<ModoDescuento>("PCT");
 
   const fetchVenta = useCallback(async () => {
     try {
@@ -141,6 +147,8 @@ export default function VentaDetailPage() {
     if (!venta) return;
     setEditTipoVenta(venta.tipoVenta as TipoVenta);
     setEditDescuento(venta.descuentoTotal);
+    setEditDescuentoMonto(venta.descuentoMonto);
+    setEditDescuentoModo(venta.descuentoMonto > 0 ? "MONTO" : "PCT");
     setEditObservaciones(venta.observaciones || "");
     setEditDiasCredito(venta.diasCredito || 30);
 
@@ -176,7 +184,8 @@ export default function VentaDetailPage() {
       setIsActioning(true);
       await patch(`/ventas/${venta.id}`, {
         tipoVenta: editTipoVenta,
-        descuentoTotal: editDescuento,
+        descuentoTotal: editDescuentoModo === "PCT" ? editDescuento : 0,
+        descuentoMonto: editDescuentoModo === "MONTO" ? editDescuentoMonto : 0,
         observaciones: editObservaciones || null,
         pagos: selectedPagos,
         ...(selectedPagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) && {
@@ -198,10 +207,12 @@ export default function VentaDetailPage() {
     }
   };
 
-  const startEditingItem = (item: { id: string; cantidad: number; descuento: number }) => {
+  const startEditingItem = (item: { id: string; cantidad: number; descuento: number; descuentoMonto: number }) => {
     setEditingItemId(item.id);
     setEditItemCantidad(item.cantidad);
     setEditItemDescuento(item.descuento);
+    setEditItemDescuentoMonto(item.descuentoMonto);
+    setEditItemDescuentoModo(item.descuentoMonto > 0 ? "MONTO" : "PCT");
   };
 
   const handleSaveItem = async () => {
@@ -210,7 +221,8 @@ export default function VentaDetailPage() {
       setIsActioning(true);
       await patch(`/ventas/${venta.id}/items/${editingItemId}`, {
         cantidad: editItemCantidad,
-        descuento: editItemDescuento,
+        descuento: editItemDescuentoModo === "PCT" ? editItemDescuento : 0,
+        descuentoMonto: editItemDescuentoModo === "MONTO" ? editItemDescuentoMonto : 0,
       });
       toast({ title: "Item actualizado" });
       setEditingItemId(null);
@@ -558,15 +570,42 @@ export default function VentaDetailPage() {
 
                 {/* Descuento General */}
                 <div className="space-y-2">
-                  <Label>Descuento General (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={editDescuento}
-                    onChange={(e) => setEditDescuento(Number(e.target.value))}
-                    className="w-full sm:w-32"
-                  />
+                  <Label>Descuento General</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-12 shrink-0 font-semibold"
+                      onClick={() => {
+                        // Cambiar de modo resetea: 20% y $20 no son equivalentes.
+                        setEditDescuentoModo((m) => (m === "PCT" ? "MONTO" : "PCT"));
+                        setEditDescuento(0);
+                        setEditDescuentoMonto(0);
+                      }}
+                      title="Alternar entre porcentaje y pesos"
+                    >
+                      {editDescuentoModo === "PCT" ? "%" : "$"}
+                    </Button>
+                    {editDescuentoModo === "PCT" ? (
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={editDescuento}
+                        onChange={(e) => setEditDescuento(Number(e.target.value))}
+                        className="w-full sm:w-32"
+                      />
+                    ) : (
+                      <Input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={editDescuentoMonto}
+                        onChange={(e) => setEditDescuentoMonto(Number(e.target.value))}
+                        className="w-full sm:w-32"
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {/* Métodos de Pago */}
@@ -696,10 +735,14 @@ export default function VentaDetailPage() {
                   </p>
                 </div>
               )}
-              {venta.descuentoTotal > 0 && (
+              {(venta.descuentoTotal > 0 || venta.descuentoMonto > 0) && (
                 <div>
                   <p className="text-sm text-muted-foreground">Descuento General</p>
-                  <p className="font-medium">{venta.descuentoTotal}%</p>
+                  <p className="font-medium">
+                    {venta.descuentoMonto > 0
+                      ? formatCurrency(venta.descuentoMonto)
+                      : `${venta.descuentoTotal}%`}
+                  </p>
                 </div>
               )}
               {venta.observaciones && (
@@ -815,16 +858,47 @@ export default function VentaDetailPage() {
                       <TableCell>{formatCurrency(item.precioUnitario)}</TableCell>
                       <TableCell>
                         {editingItemId === item.id ? (
-                          <Input
-                            type="number"
-                            min={0}
-                            max={100}
-                            value={editItemDescuento}
-                            onChange={(e) => setEditItemDescuento(Number(e.target.value))}
-                            className="w-16 h-8"
-                          />
+                          <div className="flex gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 w-9 shrink-0 px-0 font-semibold"
+                              onClick={() => {
+                                setEditItemDescuentoModo((m) => (m === "PCT" ? "MONTO" : "PCT"));
+                                setEditItemDescuento(0);
+                                setEditItemDescuentoMonto(0);
+                              }}
+                              title="Alternar entre porcentaje y pesos"
+                            >
+                              {editItemDescuentoModo === "PCT" ? "%" : "$"}
+                            </Button>
+                            {editItemDescuentoModo === "PCT" ? (
+                              <Input
+                                type="number"
+                                min={0}
+                                max={100}
+                                value={editItemDescuento}
+                                onChange={(e) => setEditItemDescuento(Number(e.target.value))}
+                                className="w-16 h-8"
+                              />
+                            ) : (
+                              <Input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={editItemDescuentoMonto}
+                                onChange={(e) => setEditItemDescuentoMonto(Number(e.target.value))}
+                                className="w-20 h-8"
+                              />
+                            )}
+                          </div>
+                        ) : item.descuentoMonto > 0 ? (
+                          formatCurrency(item.descuentoMonto)
+                        ) : item.descuento > 0 ? (
+                          `${item.descuento}%`
                         ) : (
-                          item.descuento > 0 ? `${item.descuento}%` : "-"
+                          "-"
                         )}
                       </TableCell>
                       <TableCell>{item.alicuotaIva}%</TableCell>
@@ -906,7 +980,11 @@ export default function VentaDetailPage() {
               </div>
               {venta.totalDescuento > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span>Descuento ({venta.descuentoTotal}%):</span>
+                  <span>
+                    Descuento
+                    {venta.descuentoMonto > 0 ? "" : venta.descuentoTotal > 0 ? ` (${venta.descuentoTotal}%)` : ""}
+                    :
+                  </span>
                   <span className="font-medium">-{formatCurrency(venta.totalDescuento)}</span>
                 </div>
               )}
