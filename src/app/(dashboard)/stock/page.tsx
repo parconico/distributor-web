@@ -1,39 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { get } from "@/lib/api-client";
 import { Producto, PaginatedResponse } from "@/types";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, PackagePlus, History } from "lucide-react";
 
 export default function StockPage() {
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchStock = async () => {
-      try {
-        const response = await get<PaginatedResponse<Producto>>(
-          "/stock?page=1&limit=100"
-        );
-        setProductos(response.data);
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudo cargar el stock",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchStock();
-  }, []);
+  const {
+    items: productos,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+  } = usePaginatedList<Producto>("/stock", {
+    errorMessage: "No se pudo cargar el stock",
+  });
 
   const columns: ColumnDef<Producto>[] = [
     {
@@ -71,14 +62,6 @@ export default function StockPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -98,11 +81,19 @@ export default function StockPage() {
           </Button>
         </div>
       </div>
-      <DataTable
+      <PaginatedTable
         columns={columns}
         data={productos}
-        searchKey="nombre"
+        isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
         searchPlaceholder="Buscar por código o nombre..."
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        entityLabel="producto"
       />
     </div>
   );

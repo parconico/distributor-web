@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { get, post, patch, del } from "@/lib/api-client";
 import {
@@ -20,6 +20,7 @@ import {
   formatMetodoPago,
 } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,10 +70,24 @@ export default function VentaDetailPage() {
   const [isActioning, setIsActioning] = useState(false);
 
   // Add item state (only for BORRADOR)
-  const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
+
+  // La lista de opciones cambia con cada busqueda: guardamos los productos ya
+  // vistos para poder resolver el seleccionado aunque salga del resultado.
+  const productosVistos = useRef<Map<string, Producto>>(new Map());
+  useEffect(() => {
+    for (const p of productos) productosVistos.current.set(p.id, p);
+  }, [productos]);
+  const buscarProducto = (id: string) =>
+    productos.find((p) => p.id === id) ?? productosVistos.current.get(id);
+
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);
@@ -114,13 +129,6 @@ export default function VentaDetailPage() {
     fetchVenta();
   }, [fetchVenta]);
 
-  useEffect(() => {
-    if (venta?.estado === EstadoVenta.BORRADOR || venta?.estado === EstadoVenta.CONFIRMADA) {
-      get<PaginatedResponse<Producto>>("/productos?page=1&limit=100")
-        .then((res) => setProductos(res.data))
-        .catch(() => {});
-    }
-  }, [venta?.estado]);
 
   const isDraft = venta?.estado === EstadoVenta.BORRADOR;
   const isConfirmed = venta?.estado === EstadoVenta.CONFIRMADA;
@@ -134,14 +142,6 @@ export default function VentaDetailPage() {
     return precio?.precioNeto ?? 0;
   };
 
-  const filteredProductos = productos.filter((p) => {
-    if (!searchTerm) return true;
-    const lower = searchTerm.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(lower) ||
-      p.codigo.toLowerCase().includes(lower)
-    );
-  });
 
   const startEditing = () => {
     if (!venta) return;
@@ -241,7 +241,7 @@ export default function VentaDetailPage() {
 
   const handleAddItem = async () => {
     if (!venta || !selectedProductoId) return;
-    const producto = productos.find((p) => p.id === selectedProductoId);
+    const producto = buscarProducto(selectedProductoId);
     if (!producto) return;
 
     try {
@@ -782,7 +782,7 @@ export default function VentaDetailPage() {
                         className="mb-2"
                       />
                     </div>
-                    {filteredProductos.map((p) => (
+                    {productos.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.codigo} - {p.nombre} (Stock: {p.stockActual})
                       </SelectItem>

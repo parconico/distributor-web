@@ -27,6 +27,7 @@ import {
 } from "@/types";
 import { get, post, patch } from "@/lib/api-client";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Loader2 } from "lucide-react";
 import { AxiosError } from "axios";
 
@@ -68,9 +69,6 @@ interface ProductoFormProps {
 export function ProductoForm({ producto }: ProductoFormProps) {
   const router = useRouter();
   const isEditing = !!producto;
-  const [familias, setFamilias] = useState<Familia[]>([]);
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const {
     register,
@@ -98,27 +96,20 @@ export function ProductoForm({ producto }: ProductoFormProps) {
   const unidadMedidaValue = watch("unidadMedida");
   const alicuotaIvaValue = watch("alicuotaIva");
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [familiasRes, proveedoresRes] = await Promise.all([
-          get<PaginatedResponse<Familia>>("/familias?page=1&limit=100"),
-          get<PaginatedResponse<Proveedor>>("/proveedores?page=1&limit=100"),
-        ]);
-        setFamilias(familiasRes.data);
-        setProveedores(proveedoresRes.data);
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos del formulario",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    fetchData();
-  }, []);
+  // Las familias traen sus subfamilias anidadas y son pocas, pero igual las
+  // pedimos con busqueda para no depender de que sigan siendo pocas.
+  const {
+    options: familias,
+    search: familiaSearch,
+    setSearch: setFamiliaSearch,
+  } = useRemoteOptions<Familia>("/familias");
+
+  const {
+    options: proveedores,
+    search: proveedorSearch,
+    setSearch: setProveedorSearch,
+    ocultas: proveedoresOcultos,
+  } = useRemoteOptions<Proveedor>("/proveedores");
 
   const onSubmit = async (data: ProductoFormData) => {
     try {
@@ -146,14 +137,6 @@ export function ProductoForm({ producto }: ProductoFormProps) {
       });
     }
   };
-
-  if (isLoadingData) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
 
   return (
     <Card>
@@ -205,6 +188,14 @@ export function ProductoForm({ producto }: ProductoFormProps) {
                   <SelectValue placeholder="Seleccionar subfamilia" />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar familia..."
+                      value={familiaSearch}
+                      onChange={(e) => setFamiliaSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   {familias.map((familia) => (
                     <SelectGroup key={familia.id}>
                       <SelectLabel>{familia.nombre}</SelectLabel>
@@ -238,12 +229,25 @@ export function ProductoForm({ producto }: ProductoFormProps) {
                   <SelectValue placeholder="Seleccionar proveedor" />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar proveedor..."
+                      value={proveedorSearch}
+                      onChange={(e) => setProveedorSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   <SelectItem value="_none">Sin proveedor</SelectItem>
                   {proveedores.map((prov) => (
                     <SelectItem key={prov.id} value={prov.id}>
                       {prov.razonSocial}
                     </SelectItem>
                   ))}
+                  {proveedoresOcultos > 0 && (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                      +{proveedoresOcultos} más. Afiná la búsqueda.
+                    </p>
+                  )}
                 </SelectContent>
               </Select>
             </div>

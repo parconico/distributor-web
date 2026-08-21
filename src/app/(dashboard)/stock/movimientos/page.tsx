@@ -11,7 +11,10 @@ import {
 } from "@/types";
 import { formatTipoMovimiento } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { Input } from "@/components/ui/input";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -37,52 +40,37 @@ function tipoMovimientoVariant(
 }
 
 export default function MovimientosStockPage() {
-  const [movimientos, setMovimientos] = useState<MovimientoStock[]>([]);
   const [filteredMovimientos, setFilteredMovimientos] = useState<
     MovimientoStock[]
   >([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [tipoFilter, setTipoFilter] = useState<string>("all");
   const [productoFilter, setProductoFilter] = useState<string>("all");
-  const [productos, setProductos] = useState<Producto[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [movimientosRes, productosRes] = await Promise.all([
-          get<MovimientoStock[]>("/stock/movimientos"),
-          get<PaginatedResponse<Producto>>("/productos?page=1&limit=100"),
-        ]);
-        const movData = Array.isArray(movimientosRes)
-          ? movimientosRes
-          : (movimientosRes as unknown as PaginatedResponse<MovimientoStock>)
-              .data;
-        setMovimientos(movData);
-        setFilteredMovimientos(movData);
-        setProductos(productosRes.data);
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los movimientos",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  const {
+    items: movimientos,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+  } = usePaginatedList<MovimientoStock>("/stock/movimientos", {
+    filtros: {
+      tipo: tipoFilter === "all" ? undefined : tipoFilter,
+      productoId: productoFilter === "all" ? undefined : productoFilter,
+    },
+    errorMessage: "No se pudieron cargar los movimientos",
+  });
 
-  useEffect(() => {
-    let filtered = movimientos;
-    if (tipoFilter !== "all") {
-      filtered = filtered.filter((m) => m.tipo === tipoFilter);
-    }
-    if (productoFilter !== "all") {
-      filtered = filtered.filter((m) => m.productoId === productoFilter);
-    }
-    setFilteredMovimientos(filtered);
-  }, [tipoFilter, productoFilter, movimientos]);
+  const {
+    options: productos,
+    search: productoSearch,
+    setSearch: setProductoSearch,
+  } = useRemoteOptions<Producto>("/productos");
+
+
 
   const columns: ColumnDef<MovimientoStock>[] = [
     {
@@ -139,14 +127,6 @@ export default function MovimientosStockPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -158,6 +138,14 @@ export default function MovimientosStockPage() {
             <SelectValue placeholder="Filtrar por producto" />
           </SelectTrigger>
           <SelectContent>
+            <div className="p-2">
+              <Input
+                placeholder="Buscar producto..."
+                value={productoSearch}
+                onChange={(e) => setProductoSearch(e.target.value)}
+                className="mb-2"
+              />
+            </div>
             <SelectItem value="all">Todos los productos</SelectItem>
             {productos.map((p) => (
               <SelectItem key={p.id} value={p.id}>
@@ -180,11 +168,19 @@ export default function MovimientosStockPage() {
           </SelectContent>
         </Select>
       </div>
-      <DataTable
+      <PaginatedTable
         columns={columns}
-        data={filteredMovimientos}
-        searchKey="motivo"
+        data={movimientos}
+        isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
         searchPlaceholder="Buscar por motivo..."
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        entityLabel="movimiento"
       />
     </div>
   );

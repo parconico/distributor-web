@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
-import { get } from "@/lib/api-client";
-import { Remito, PaginatedResponse, EstadoRemito } from "@/types";
+import { Remito, EstadoRemito } from "@/types";
 import { formatEstadoRemito, estadoRemitoVariant } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -22,40 +22,22 @@ import { Eye, Loader2, Plus } from "lucide-react";
 
 export default function RemitosPage() {
   const router = useRouter();
-  const [remitos, setRemitos] = useState<Remito[]>([]);
-  const [filteredRemitos, setFilteredRemitos] = useState<Remito[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
 
-  const fetchRemitos = async () => {
-    try {
-      const response = await get<PaginatedResponse<Remito>>(
-        "/remitos?page=1&limit=100"
-      );
-      setRemitos(response.data);
-      setFilteredRemitos(response.data);
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los remitos",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRemitos();
-  }, []);
-
-  useEffect(() => {
-    if (estadoFilter === "all") {
-      setFilteredRemitos(remitos);
-    } else {
-      setFilteredRemitos(remitos.filter((r) => r.estado === estadoFilter));
-    }
-  }, [estadoFilter, remitos]);
+  const {
+    items: remitos,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+  } = usePaginatedList<Remito>("/remitos", {
+    filtros: { estado: estadoFilter === "all" ? undefined : estadoFilter },
+    errorMessage: "No se pudieron cargar los remitos",
+  });
 
   const columns: ColumnDef<Remito>[] = [
     {
@@ -106,14 +88,6 @@ export default function RemitosPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -125,26 +99,34 @@ export default function RemitosPage() {
           </Link>
         </Button>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filtrar por estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            {Object.values(EstadoRemito).map((estado) => (
-              <SelectItem key={estado} value={estado}>
-                {formatEstadoRemito(estado)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <DataTable
+      <PaginatedTable
         columns={columns}
-        data={filteredRemitos}
-        searchKey="numero"
-        searchPlaceholder="Buscar remitos..."
+        data={remitos}
+        isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por número o cliente..."
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        entityLabel="remito"
+        toolbar={
+          <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filtrar por estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {Object.values(EstadoRemito).map((estado) => (
+                <SelectItem key={estado} value={estado}>
+                  {formatEstadoRemito(estado)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
       />
     </div>
   );

@@ -11,6 +11,7 @@ import {
   estadoVentaVariant,
 } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { DataTable } from "@/components/tables/data-table";
 import {
   Card,
@@ -58,17 +59,18 @@ export default function ReporteVentasPage() {
   const [vendedorId, setVendedorId] = useState<string>("all");
   const [data, setData] = useState<ReporteVentasData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [vendedores, setVendedores] = useState<User[]>([]);
+
+  const {
+    options: clientes,
+    search: clienteSearch,
+    setSearch: setClienteSearch,
+  } = useRemoteOptions<Cliente>("/clientes");
 
   useEffect(() => {
     const fetchFilters = async () => {
       try {
-        const [clientesRes, vendedoresRes] = await Promise.all([
-          get<{ data: Cliente[] }>("/clientes?page=1&limit=500"),
-          get<User[]>("/users"),
-        ]);
-        setClientes(clientesRes.data ?? []);
+        const vendedoresRes = await get<User[]>("/users");
         setVendedores(Array.isArray(vendedoresRes) ? vendedoresRes : []);
       } catch {
         // Silently fail for filters
@@ -204,6 +206,14 @@ export default function ReporteVentasPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={clienteSearch}
+                      onChange={(e) => setClienteSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.razonSocial}

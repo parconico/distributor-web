@@ -11,6 +11,7 @@ import {
   EstadoVenta,
 } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,66 +45,48 @@ interface LocalItem {
 export default function NuevoRemitoPage() {
   const router = useRouter();
 
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [ventas, setVentas] = useState<Venta[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const [clienteId, setClienteId] = useState("");
   const [ventaId, setVentaId] = useState<string>("");
   const [observaciones, setObservaciones] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    options: clientes,
+    search: clienteSearch,
+    setSearch: setClienteSearch,
+    ocultas: clientesOcultos,
+  } = useRemoteOptions<Cliente>("/clientes");
+
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
 
   const [items, setItems] = useState<LocalItem[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [clientesRes, productosRes, ventasRes] = await Promise.all([
-          get<PaginatedResponse<Cliente>>("/clientes?page=1&limit=100"),
-          get<PaginatedResponse<Producto>>("/productos?page=1&limit=100"),
-          get<PaginatedResponse<Venta>>("/ventas?page=1&limit=200"),
-        ]);
-        setClientes(clientesRes.data);
-        setProductos(productosRes.data);
-        setVentas(
-          ventasRes.data.filter(
-            (v) =>
-              v.estado === EstadoVenta.CONFIRMADA ||
-              v.estado === EstadoVenta.FACTURADA
-          )
-        );
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    fetchData();
-  }, []);
 
-  const filteredProductos = useMemo(() => {
-    if (!searchTerm) return productos;
-    const lower = searchTerm.toLowerCase();
-    return productos.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(lower) ||
-        p.codigo.toLowerCase().includes(lower)
-    );
-  }, [productos, searchTerm]);
 
-  const ventasDelCliente = useMemo(() => {
-    if (!clienteId) return ventas;
-    return ventas.filter((v) => v.clienteId === clienteId);
-  }, [ventas, clienteId]);
+  const { options: ventasCliente } = useRemoteOptions<Venta>("/ventas", {
+    filtros: { clienteId: clienteId || undefined },
+    enabled: Boolean(clienteId),
+  });
+
+  // El endpoint filtra por un estado a la vez y necesitamos dos, asi que el
+  // recorte final queda acá sobre la tanda ya acotada por cliente.
+  const ventasDelCliente = useMemo(
+    () =>
+      ventasCliente.filter(
+        (v) =>
+          v.estado === EstadoVenta.CONFIRMADA ||
+          v.estado === EstadoVenta.FACTURADA
+      ),
+    [ventasCliente]
+  );
 
   const handleAddItem = () => {
     const producto = productos.find((p) => p.id === selectedProductoId);
@@ -202,14 +185,6 @@ export default function NuevoRemitoPage() {
     }
   };
 
-  if (isLoadingData) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -232,6 +207,14 @@ export default function NuevoRemitoPage() {
                   <SelectValue placeholder="Seleccionar cliente" />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={clienteSearch}
+                      onChange={(e) => setClienteSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.razonSocial}
@@ -297,7 +280,7 @@ export default function NuevoRemitoPage() {
                       className="mb-2"
                     />
                   </div>
-                  {filteredProductos.map((p) => (
+                  {productos.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigo} - {p.nombre} (Stock: {p.stockActual})
                     </SelectItem>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { get, post, patch, del } from "@/lib/api-client";
 import { Familia, Subfamilia } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,8 +32,6 @@ import {
 import { AxiosError } from "axios";
 
 export default function FamiliasPage() {
-  const [familias, setFamilias] = useState<Familia[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [expandedFamilias, setExpandedFamilias] = useState<Set<string>>(
     new Set()
   );
@@ -59,24 +58,20 @@ export default function FamiliasPage() {
   );
   const [editingSubfamiliaName, setEditingSubfamiliaName] = useState("");
 
-  const fetchFamilias = async () => {
-    try {
-      const response = await get<{ data: Familia[] }>("/familias?page=1&limit=100");
-      setFamilias(response.data);
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las familias",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchFamilias();
-  }, []);
+  const {
+    items: familias,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+    refetch: fetchFamilias,
+  } = usePaginatedList<Familia>("/familias", {
+    errorMessage: "No se pudieron cargar las familias",
+  });
 
   const toggleExpand = (id: string) => {
     setExpandedFamilias((prev) => {
@@ -269,10 +264,17 @@ export default function FamiliasPage() {
         </Card>
       )}
 
+      <Input
+        placeholder="Buscar familia..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full sm:max-w-sm"
+      />
+
       <div className="space-y-2">
         {familias.length === 0 && (
           <p className="text-center text-muted-foreground py-8">
-            No hay familias creadas
+            {search ? `Sin resultados para "${search}"` : "No hay familias creadas"}
           </p>
         )}
         {familias.map((familia) => (
@@ -518,6 +520,36 @@ export default function FamiliasPage() {
           </Card>
         ))}
       </div>
+
+      {total > 0 && (
+        <div className="flex flex-col gap-2 px-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-muted-foreground">
+            {total} familia(s) &middot; mostrando {(page - 1) * pageSize + 1}-
+            {Math.min(page * pageSize, total)}
+          </div>
+          <div className="flex items-center justify-between gap-2 sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page <= 1}
+            >
+              Anterior
+            </Button>
+            <div className="text-xs text-muted-foreground sm:text-sm">
+              Pág. {page}/{totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page >= totalPages}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

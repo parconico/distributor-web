@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { get, post, del } from "@/lib/api-client";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { formatCurrency, formatEstadoCompra, estadoCompraVariant } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,11 +55,25 @@ export default function CompraDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isActioning, setIsActioning] = useState(false);
 
-  const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [precioUnitario, setPrecioUnitario] = useState(0);
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
+
+  // La lista de opciones cambia con cada busqueda: guardamos los productos ya
+  // vistos para poder resolver el seleccionado aunque salga del resultado.
+  const productosVistos = useRef<Map<string, Producto>>(new Map());
+  useEffect(() => {
+    for (const p of productos) productosVistos.current.set(p.id, p);
+  }, [productos]);
+  const buscarProducto = (id: string) =>
+    productos.find((p) => p.id === id) ?? productosVistos.current.get(id);
+
 
   const fetchCompra = useCallback(async () => {
     try {
@@ -79,29 +94,14 @@ export default function CompraDetailPage() {
     fetchCompra();
   }, [fetchCompra]);
 
-  useEffect(() => {
-    if (compra?.estado === EstadoCompra.BORRADOR) {
-      get<PaginatedResponse<Producto>>("/productos?page=1&limit=100")
-        .then((res) => setProductos(res.data))
-        .catch(() => {});
-    }
-  }, [compra?.estado]);
 
   const isDraft = compra?.estado === EstadoCompra.BORRADOR;
   const isConfirmada = compra?.estado === EstadoCompra.CONFIRMADA;
   const isRecibida = compra?.estado === EstadoCompra.RECIBIDA;
   const canAnular = isConfirmada || isRecibida;
 
-  const filteredProductos = productos.filter((p) => {
-    if (!searchTerm) return true;
-    const lower = searchTerm.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(lower) ||
-      p.codigo.toLowerCase().includes(lower)
-    );
-  });
 
-  const selectedProducto = productos.find((p) => p.id === selectedProductoId);
+  const selectedProducto = buscarProducto(selectedProductoId);
 
   useEffect(() => {
     if (selectedProducto) {
@@ -421,7 +421,7 @@ export default function CompraDetailPage() {
                         className="mb-2"
                       />
                     </div>
-                    {filteredProductos.map((p) => (
+                    {productos.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.codigo} - {p.nombre} (IVA: {p.alicuotaIva}%)
                       </SelectItem>

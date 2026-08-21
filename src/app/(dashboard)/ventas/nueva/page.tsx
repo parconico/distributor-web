@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { get, post } from "@/lib/api-client";
-import { Cliente, MetodoPago, Producto, PaginatedResponse, ListaPrecio } from "@/types";
+import { post } from "@/lib/api-client";
+import { Cliente, MetodoPago, Producto, ListaPrecio } from "@/types";
 import { formatCurrency, formatListaPrecio, formatMetodoPago } from "@/lib/formatters";
 import { aplicarDescuento, calcularLineaVenta } from "@/lib/iva-calculator";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,9 +53,6 @@ interface LocalItem {
 export default function NuevaVentaPage() {
   const router = useRouter();
 
-  const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const [clienteId, setClienteId] = useState("");
@@ -70,33 +68,28 @@ export default function NuevaVentaPage() {
   const [diasCredito, setDiasCredito] = useState(30);
   const [observaciones, setObservaciones] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState("");
   const [selectedProductoId, setSelectedProductoId] = useState("");
+  // Guardamos el producto elegido, no solo su id: la lista de opciones cambia
+  // con cada busqueda y el seleccionado puede no estar en la tanda actual.
+  const [selectedProducto, setSelectedProducto] = useState<Producto | null>(null);
   const [cantidad, setCantidad] = useState(1);
+
+  const {
+    options: clientes,
+    search: clienteSearch,
+    setSearch: setClienteSearch,
+    ocultas: clientesOcultos,
+  } = useRemoteOptions<Cliente>("/clientes");
+
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
 
   const [items, setItems] = useState<LocalItem[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [clientesRes, productosRes] = await Promise.all([
-          get<PaginatedResponse<Cliente>>("/clientes?page=1&limit=100"),
-          get<PaginatedResponse<Producto>>("/productos?page=1&limit=100"),
-        ]);
-        setClientes(clientesRes.data);
-        setProductos(productosRes.data);
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    fetchData();
-  }, []);
 
   const handleClienteChange = useCallback(
     (id: string) => {
@@ -109,20 +102,6 @@ export default function NuevaVentaPage() {
     [clientes]
   );
 
-  const filteredProductos = useMemo(() => {
-    if (!searchTerm) return productos;
-    const lower = searchTerm.toLowerCase();
-    return productos.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(lower) ||
-        p.codigo.toLowerCase().includes(lower)
-    );
-  }, [productos, searchTerm]);
-
-  const selectedProducto = useMemo(
-    () => productos.find((p) => p.id === selectedProductoId),
-    [productos, selectedProductoId]
-  );
 
   const getPrecioForLista = useCallback(
     (producto: Producto): number => {
@@ -167,6 +146,7 @@ export default function NuevaVentaPage() {
     ]);
 
     setSelectedProductoId("");
+    setSelectedProducto(null);
     setSearchTerm("");
     setCantidad(1);
   };
@@ -309,14 +289,6 @@ export default function NuevaVentaPage() {
     }
   };
 
-  if (isLoadingData) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -336,11 +308,24 @@ export default function NuevaVentaPage() {
                   <SelectValue placeholder="Seleccionar cliente" />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar por nombre o documento..."
+                      value={clienteSearch}
+                      onChange={(e) => setClienteSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.razonSocial}
                     </SelectItem>
                   ))}
+                  {clientesOcultos > 0 && (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                      +{clientesOcultos} más. Afiná la búsqueda.
+                    </p>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -509,9 +494,19 @@ export default function NuevaVentaPage() {
           <div className="flex items-end gap-4">
             <div className="flex-1 space-y-2">
               <Label>Producto</Label>
-              <Select value={selectedProductoId} onValueChange={setSelectedProductoId}>
+              <Select
+                value={selectedProductoId}
+                onValueChange={(id) => {
+                  setSelectedProductoId(id);
+                  setSelectedProducto(productos.find((p) => p.id === id) ?? null);
+                }}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Buscar producto..." />
+                  <SelectValue placeholder="Buscar producto...">
+                    {selectedProducto
+                      ? `${selectedProducto.codigo} - ${selectedProducto.nombre}`
+                      : undefined}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <div className="p-2">
@@ -522,11 +517,16 @@ export default function NuevaVentaPage() {
                       className="mb-2"
                     />
                   </div>
-                  {filteredProductos.map((p) => (
+                  {productos.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigo} - {p.nombre} (Stock: {p.stockActual})
                     </SelectItem>
                   ))}
+                  {productosOcultos > 0 && (
+                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                      +{productosOcultos} más. Afiná la búsqueda.
+                    </p>
+                  )}
                 </SelectContent>
               </Select>
             </div>

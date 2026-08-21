@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api-client";
 import { Producto, PaginatedResponse } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,43 +22,19 @@ import { AxiosError } from "axios";
 
 export default function IngresoStockPage() {
   const router = useRouter();
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [productoId, setProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [motivo, setMotivo] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
 
-  useEffect(() => {
-    const fetchProductos = async () => {
-      try {
-        const response = await get<PaginatedResponse<Producto>>(
-          "/productos?page=1&limit=100"
-        );
-        setProductos(response.data);
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los productos",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    fetchProductos();
-  }, []);
 
-  const filteredProductos = productos.filter((p) => {
-    if (!searchTerm) return true;
-    const lower = searchTerm.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(lower) ||
-      p.codigo.toLowerCase().includes(lower)
-    );
-  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,14 +87,6 @@ export default function IngresoStockPage() {
     }
   };
 
-  if (isLoadingData) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="mx-auto max-w-2xl">
       <Card>
@@ -141,7 +110,7 @@ export default function IngresoStockPage() {
                       className="mb-2"
                     />
                   </div>
-                  {filteredProductos.map((p) => (
+                  {productos.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigo} - {p.nombre} (Stock actual: {p.stockActual})
                     </SelectItem>

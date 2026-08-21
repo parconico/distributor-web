@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { get, post, del } from "@/lib/api-client";
@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { formatEstadoRemito, estadoRemitoVariant } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,10 +55,24 @@ export default function RemitoDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isActioning, setIsActioning] = useState(false);
 
-  const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
+
+  // La lista de opciones cambia con cada busqueda: guardamos los productos ya
+  // vistos para poder resolver el seleccionado aunque salga del resultado.
+  const productosVistos = useRef<Map<string, Producto>>(new Map());
+  useEffect(() => {
+    for (const p of productos) productosVistos.current.set(p.id, p);
+  }, [productos]);
+  const buscarProducto = (id: string) =>
+    productos.find((p) => p.id === id) ?? productosVistos.current.get(id);
+
 
   const fetchRemito = useCallback(async () => {
     try {
@@ -78,29 +93,14 @@ export default function RemitoDetailPage() {
     fetchRemito();
   }, [fetchRemito]);
 
-  useEffect(() => {
-    if (remito?.estado === EstadoRemito.BORRADOR) {
-      get<PaginatedResponse<Producto>>("/productos?page=1&limit=100")
-        .then((res) => setProductos(res.data))
-        .catch(() => {});
-    }
-  }, [remito?.estado]);
 
   const isDraft = remito?.estado === EstadoRemito.BORRADOR;
   const isConfirmed = remito?.estado === EstadoRemito.CONFIRMADO;
 
-  const filteredProductos = productos.filter((p) => {
-    if (!searchTerm) return true;
-    const lower = searchTerm.toLowerCase();
-    return (
-      p.nombre.toLowerCase().includes(lower) ||
-      p.codigo.toLowerCase().includes(lower)
-    );
-  });
 
   const handleAddItem = async () => {
     if (!remito || !selectedProductoId) return;
-    const producto = productos.find((p) => p.id === selectedProductoId);
+    const producto = buscarProducto(selectedProductoId);
     if (!producto) return;
 
     try {
@@ -399,7 +399,7 @@ export default function RemitoDetailPage() {
                         className="mb-2"
                       />
                     </div>
-                    {filteredProductos.map((p) => (
+                    {productos.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.codigo} - {p.nombre} (Stock: {p.stockActual})
                       </SelectItem>

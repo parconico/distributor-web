@@ -9,7 +9,9 @@ import apiClient from "@/lib/api-client";
 import { Compra, Proveedor, PaginatedResponse, EstadoCompra, Role } from "@/types";
 import { formatCurrency, formatEstadoCompra, estadoCompraVariant } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { RoleGate } from "@/components/shared/role-gate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -64,31 +66,39 @@ interface CompraImportResult {
 
 export default function ComprasPage() {
   const router = useRouter();
-  const [compras, setCompras] = useState<Compra[]>([]);
-  const [filteredCompras, setFilteredCompras] = useState<Compra[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [estadoFilter, setEstadoFilter] = useState<string>("all");
+
+  const {
+    items: compras,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+    refetch: fetchCompras,
+  } = usePaginatedList<Compra>("/compras", {
+    filtros: { estado: estadoFilter === "all" ? undefined : estadoFilter },
+    errorMessage: "No se pudieron cargar las compras",
+  });
 
   // Import state
   const [importOpen, setImportOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [sheetIndex, setSheetIndex] = useState("0");
   const [proveedorId, setProveedorId] = useState("");
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
+
+  const {
+    options: proveedores,
+    search: proveedorSearch,
+    setSearch: setProveedorSearch,
+  } = useRemoteOptions<Proveedor>("/proveedores");
   const [isImporting, setIsImporting] = useState(false);
   const [importResult, setImportResult] = useState<CompraImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchProveedores = async () => {
-    try {
-      const response = await get<PaginatedResponse<Proveedor>>(
-        "/proveedores?page=1&limit=100"
-      );
-      setProveedores(response.data);
-    } catch {
-      // silent
-    }
-  };
 
   const handleImport = async () => {
     if (!selectedFile) return;
@@ -131,28 +141,6 @@ export default function ComprasPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const fetchCompras = async () => {
-    try {
-      const response = await get<PaginatedResponse<Compra>>(
-        "/compras?page=1&limit=100"
-      );
-      setCompras(response.data);
-      setFilteredCompras(response.data);
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar las compras",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchCompras();
-    fetchProveedores();
-  }, []);
 
   const handleDelete = async (id: string) => {
     try {
@@ -169,14 +157,6 @@ export default function ComprasPage() {
       });
     }
   };
-
-  useEffect(() => {
-    if (estadoFilter === "all") {
-      setFilteredCompras(compras);
-    } else {
-      setFilteredCompras(compras.filter((c) => c.estado === estadoFilter));
-    }
-  }, [estadoFilter, compras]);
 
   const columns: ColumnDef<Compra>[] = [
     {
@@ -254,14 +234,6 @@ export default function ComprasPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -289,26 +261,34 @@ export default function ComprasPage() {
           </RoleGate>
         </div>
       </div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Select value={estadoFilter} onValueChange={setEstadoFilter}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Filtrar por estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
-            {Object.values(EstadoCompra).map((estado) => (
-              <SelectItem key={estado} value={estado}>
-                {formatEstadoCompra(estado)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <DataTable
+      <PaginatedTable
         columns={columns}
-        data={filteredCompras}
-        searchKey="numero"
-        searchPlaceholder="Buscar compras..."
+        data={compras}
+        isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por número o proveedor..."
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        entityLabel="compra"
+        toolbar={
+          <Select value={estadoFilter} onValueChange={setEstadoFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Filtrar por estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              {Object.values(EstadoCompra).map((estado) => (
+                <SelectItem key={estado} value={estado}>
+                  {formatEstadoCompra(estado)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        }
       />
 
       {/* Import Dialog */}
@@ -340,6 +320,14 @@ export default function ComprasPage() {
                     <SelectValue placeholder="Seleccionar proveedor..." />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="p-2">
+                      <Input
+                        placeholder="Buscar proveedor..."
+                        value={proveedorSearch}
+                        onChange={(e) => setProveedorSearch(e.target.value)}
+                        className="mb-2"
+                      />
+                    </div>
                     {proveedores.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.razonSocial}

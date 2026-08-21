@@ -8,6 +8,7 @@ import { get, post } from "@/lib/api-client";
 import { Cliente, Deudor, MetodoPago, PaginatedResponse } from "@/types";
 import { formatCurrency } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { DataTable } from "@/components/tables/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -38,9 +39,14 @@ export default function CuentasCorrientesPage() {
   const [saldosFavor, setSaldosFavor] = useState<Deudor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const {
+    options: clientes,
+    search: clienteSearch,
+    setSearch: setClienteSearch,
+  } = useRemoteOptions<Cliente>("/clientes");
+
   // Agregar cliente dialog
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [selectedClienteId, setSelectedClienteId] = useState("");
   const [saldoInicial, setSaldoInicial] = useState<number>(0);
   const [metodoPago, setMetodoPago] = useState<MetodoPago>(MetodoPago.EFECTIVO);
@@ -66,16 +72,6 @@ export default function CuentasCorrientesPage() {
     }
   };
 
-  const fetchClientes = async () => {
-    try {
-      const response = await get<PaginatedResponse<Cliente>>(
-        "/clientes?page=1&limit=500"
-      );
-      setClientes(response.data);
-    } catch {
-      // silent
-    }
-  };
 
   useEffect(() => {
     fetchData();
@@ -92,7 +88,8 @@ export default function CuentasCorrientesPage() {
     setSaldoInicial(0);
     setMetodoPago(MetodoPago.EFECTIVO);
     setDescripcion("Saldo a favor inicial");
-    fetchClientes();
+    // El listado de clientes lo trae useRemoteOptions al abrir el dialogo.
+    setClienteSearch("");
     setDialogOpen(true);
   };
 
@@ -286,6 +283,14 @@ export default function CuentasCorrientesPage() {
                   <SelectValue placeholder="Seleccionar cliente..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={clienteSearch}
+                      onChange={(e) => setClienteSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   {clientes
                     .filter((c) => !clientesConCuenta.has(c.id))
                     .map((c) => (

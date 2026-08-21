@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { get, post } from "@/lib/api-client";
 import { Proveedor, Producto, PaginatedResponse } from "@/types";
 import { formatCurrency } from "@/lib/formatters";
 import { calcularLineaVenta } from "@/lib/iva-calculator";
 import { toast } from "@/hooks/use-toast";
+import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,55 +45,44 @@ interface LocalItem {
 export default function NuevaCompraPage() {
   const router = useRouter();
 
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const [proveedorId, setProveedorId] = useState("");
   const [observaciones, setObservaciones] = useState("");
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const {
+    options: proveedores,
+    search: proveedorSearch,
+    setSearch: setProveedorSearch,
+    ocultas: proveedoresOcultos,
+  } = useRemoteOptions<Proveedor>("/proveedores");
+
+  const {
+    options: productos,
+    search: searchTerm,
+    setSearch: setSearchTerm,
+    ocultas: productosOcultos,
+  } = useRemoteOptions<Producto>("/productos");
+
+  // La lista de opciones cambia con cada busqueda: guardamos los productos ya
+  // vistos para poder resolver el seleccionado aunque salga del resultado.
+  const productosVistos = useRef<Map<string, Producto>>(new Map());
+  useEffect(() => {
+    for (const p of productos) productosVistos.current.set(p.id, p);
+  }, [productos]);
+  const buscarProducto = (id: string) =>
+    productos.find((p) => p.id === id) ?? productosVistos.current.get(id);
+
   const [selectedProductoId, setSelectedProductoId] = useState("");
   const [cantidad, setCantidad] = useState(1);
   const [precioUnitario, setPrecioUnitario] = useState(0);
 
   const [items, setItems] = useState<LocalItem[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [proveedoresRes, productosRes] = await Promise.all([
-          get<PaginatedResponse<Proveedor>>("/proveedores?page=1&limit=100"),
-          get<PaginatedResponse<Producto>>("/productos?page=1&limit=100"),
-        ]);
-        setProveedores(proveedoresRes.data);
-        setProductos(productosRes.data);
-      } catch {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    fetchData();
-  }, []);
 
-  const filteredProductos = useMemo(() => {
-    if (!searchTerm) return productos;
-    const lower = searchTerm.toLowerCase();
-    return productos.filter(
-      (p) =>
-        p.nombre.toLowerCase().includes(lower) ||
-        p.codigo.toLowerCase().includes(lower)
-    );
-  }, [productos, searchTerm]);
 
   const selectedProducto = useMemo(
-    () => productos.find((p) => p.id === selectedProductoId),
+    () => buscarProducto(selectedProductoId),
     [productos, selectedProductoId]
   );
 
@@ -258,14 +248,6 @@ export default function NuevaCompraPage() {
     }
   };
 
-  if (isLoadingData) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -285,6 +267,14 @@ export default function NuevaCompraPage() {
                   <SelectValue placeholder="Seleccionar proveedor" />
                 </SelectTrigger>
                 <SelectContent>
+                  <div className="p-2">
+                    <Input
+                      placeholder="Buscar proveedor..."
+                      value={proveedorSearch}
+                      onChange={(e) => setProveedorSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                  </div>
                   {proveedores.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.razonSocial}
@@ -327,7 +317,7 @@ export default function NuevaCompraPage() {
                       className="mb-2"
                     />
                   </div>
-                  {filteredProductos.map((p) => (
+                  {productos.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.codigo} - {p.nombre} (IVA: {p.alicuotaIva}%)
                     </SelectItem>

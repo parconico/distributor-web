@@ -7,7 +7,8 @@ import { get, post, patch, del } from "@/lib/api-client";
 import { Cliente, MetodoPago, MovimientoCuentaCorriente, PaginatedResponse, Role, TipoMovimientoCuenta } from "@/types";
 import { formatCurrency, formatMetodoPago, formatTipoMovimientoCuenta } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,7 +51,21 @@ export default function CuentaCorrienteDetailPage() {
   const clienteId = params.clienteId as string;
 
   const [cliente, setCliente] = useState<Cliente | null>(null);
-  const [movimientos, setMovimientos] = useState<MovimientoCuentaCorriente[]>([]);
+  const {
+    items: movimientos,
+    isLoading: isLoadingMovimientos,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total: totalMovimientos,
+    totalPages,
+    pageSize,
+    refetch: refetchMovimientos,
+  } = usePaginatedList<MovimientoCuentaCorriente>(
+    `/cuentas-corrientes/${clienteId}`,
+    { errorMessage: "No se pudieron cargar los movimientos" }
+  );
   const [saldo, setSaldo] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -77,14 +92,15 @@ export default function CuentaCorrienteDetailPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [clienteData, movimientosData, saldoData] = await Promise.all([
+      const [clienteData, saldoData] = await Promise.all([
         get<Cliente>(`/clientes/${clienteId}`),
-        get<PaginatedResponse<MovimientoCuentaCorriente>>(`/cuentas-corrientes/${clienteId}?limit=1000`),
         get<{ saldo: number }>(`/cuentas-corrientes/${clienteId}/saldo`),
       ]);
       setCliente(clienteData);
-      setMovimientos(movimientosData.data);
       setSaldo(saldoData.saldo);
+      // Los movimientos los maneja usePaginatedList; los recargamos aparte
+      // porque el saldo pudo cambiar por una alta o una edicion.
+      refetchMovimientos();
     } catch {
       toast({
         title: "Error",
@@ -608,7 +624,7 @@ export default function CuentaCorrienteDetailPage() {
             <CardTitle className="text-sm font-medium">Movimientos</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{movimientos.length}</p>
+            <p className="text-3xl font-bold">{totalMovimientos}</p>
             <p className="text-xs text-muted-foreground mt-1">
               Total de movimientos registrados
             </p>
@@ -618,11 +634,19 @@ export default function CuentaCorrienteDetailPage() {
 
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Movimientos</h2>
-        <DataTable
+        <PaginatedTable
           columns={columns}
           data={movimientos}
-          searchKey="descripcion"
+          isLoading={isLoadingMovimientos}
+          search={search}
+          onSearchChange={setSearch}
           searchPlaceholder="Buscar movimientos..."
+          page={page}
+          totalPages={totalPages}
+          total={totalMovimientos}
+          pageSize={pageSize}
+          onPageChange={setPage}
+          entityLabel="movimiento"
         />
       </div>
 

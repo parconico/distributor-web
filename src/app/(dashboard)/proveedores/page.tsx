@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
-import { get, del } from "@/lib/api-client";
-import { Proveedor, PaginatedResponse, Role } from "@/types";
+import { del } from "@/lib/api-client";
+import { Proveedor, Role } from "@/types";
 import { formatCondicionIva } from "@/lib/formatters";
 import { formatCuit } from "@/lib/cuit-validator";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { RoleGate } from "@/components/shared/role-gate";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,33 +22,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Loader2, Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 import { AxiosError } from "axios";
 
 export default function ProveedoresPage() {
-  const [proveedores, setProveedores] = useState<Proveedor[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchProveedores = async () => {
-    try {
-      const response = await get<PaginatedResponse<Proveedor>>(
-        "/proveedores?page=1&limit=100"
-      );
-      setProveedores(response.data);
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los proveedores",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProveedores();
-  }, []);
+  const {
+    items: proveedores,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+    refetch: fetchProveedores,
+  } = usePaginatedList<Proveedor>("/proveedores", {
+    errorMessage: "No se pudieron cargar los proveedores",
+  });
 
   const handleDelete = async (id: string) => {
     try {
@@ -133,14 +124,6 @@ export default function ProveedoresPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -154,11 +137,19 @@ export default function ProveedoresPage() {
           </Button>
         </RoleGate>
       </div>
-      <DataTable
+      <PaginatedTable
         columns={columns}
         data={proveedores}
-        searchKey="razonSocial"
-        searchPlaceholder="Buscar proveedores..."
+        isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Buscar por razón social o CUIT..."
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        entityLabel="proveedor"
       />
     </div>
   );

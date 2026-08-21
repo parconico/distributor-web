@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
-import { get } from "@/lib/api-client";
-import { Comprobante, PaginatedResponse, Role } from "@/types";
+import { Comprobante, Role } from "@/types";
 import {
   formatCurrency,
   formatTipoComprobante,
   formatPuntoVentaNumero,
 } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
-import { DataTable } from "@/components/tables/data-table";
+import { PaginatedTable } from "@/components/tables/paginated-table";
+import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { RoleGate } from "@/components/shared/role-gate";
@@ -19,23 +19,21 @@ import { Eye, Loader2, Settings } from "lucide-react";
 
 export default function FacturacionPage() {
   const router = useRouter();
-  const [comprobantes, setComprobantes] = useState<Comprobante[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
 
-  const fetchComprobantes = async () => {
-    try {
-      const response = await get<PaginatedResponse<Comprobante>>("/arca/comprobantes?page=1&limit=100");
-      setComprobantes(response.data);
-    } catch {
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los comprobantes",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const {
+    items: comprobantes,
+    isLoading,
+    search,
+    setSearch,
+    page,
+    setPage,
+    total,
+    totalPages,
+    pageSize,
+    refetch: fetchComprobantes,
+  } = usePaginatedList<Comprobante>("/arca/comprobantes", {
+    errorMessage: "No se pudieron cargar los comprobantes",
+  });
 
   useEffect(() => {
     fetchComprobantes();
@@ -107,14 +105,6 @@ export default function FacturacionPage() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -130,11 +120,19 @@ export default function FacturacionPage() {
         </RoleGate>
       </div>
 
-      <DataTable
+      <PaginatedTable
         columns={columns}
         data={comprobantes}
-        searchKey="cliente"
+        isLoading={isLoading}
+        search={search}
+        onSearchChange={setSearch}
         searchPlaceholder="Buscar comprobantes..."
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        pageSize={pageSize}
+        onPageChange={setPage}
+        entityLabel="comprobante"
       />
     </div>
   );
