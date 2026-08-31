@@ -502,11 +502,9 @@ export default function NuevaVentaPage() {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Buscar producto...">
-                    {selectedProducto
-                      ? `${selectedProducto.codigo} - ${selectedProducto.nombre}`
-                      : undefined}
-                  </SelectValue>
+                  {/* Sin children: Radix usa este span como contenedor de portal
+                      para la opcion elegida y escribirle texto encima rompe. */}
+                  <SelectValue placeholder="Buscar producto..." />
                 </SelectTrigger>
                 <SelectContent>
                   <div className="p-2">

@@ -9,7 +9,7 @@ import { PaginatedTable } from "@/components/tables/paginated-table";
 import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, PackagePlus, History } from "lucide-react";
+import { Loader2, PackagePlus, PackageMinus, History } from "lucide-react";
 
 export default function StockPage() {
   const {
@@ -77,6 +77,12 @@ export default function StockPage() {
             <Link href="/stock/ingreso">
               <PackagePlus className="mr-2 h-4 w-4" />
               Ingreso de Stock
+            </Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/stock/egreso">
+              <PackageMinus className="mr-2 h-4 w-4" />
+              Egreso de Stock
             </Link>
           </Button>
         </div>
