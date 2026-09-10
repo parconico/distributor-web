@@ -180,6 +180,8 @@ export interface Venta {
   conIva: boolean;
   descuentoTotal: number;
   descuentoMonto: number;
+  alicuotaIngresosBrutos: number;
+  montoIngresosBrutos: number;
   subtotal: number;
   totalIva: number;
   totalDescuento: number;
@@ -285,6 +287,7 @@ export interface Comprobante {
   importeTotal: number;
   importeNeto: number;
   importeIva: number;
+  importeTributos: number;
   resultado?: string;
   createdAt: string;
   ivas?: ComprobanteIva[];

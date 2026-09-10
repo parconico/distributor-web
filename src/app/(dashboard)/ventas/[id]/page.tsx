@@ -94,6 +94,7 @@ export default function VentaDetailPage() {
   const [editTipoVenta, setEditTipoVenta] = useState<TipoVenta>(TipoVenta.EN_BLANCO);
   const [editDescuento, setEditDescuento] = useState(0);
   const [editDescuentoMonto, setEditDescuentoMonto] = useState(0);
+  const [editAlicuotaIngresosBrutos, setEditAlicuotaIngresosBrutos] = useState(0);
   const [editDescuentoModo, setEditDescuentoModo] = useState<ModoDescuento>("PCT");
   const [editObservaciones, setEditObservaciones] = useState("");
   const [editDiasCredito, setEditDiasCredito] = useState(30);
@@ -148,6 +149,7 @@ export default function VentaDetailPage() {
     setEditTipoVenta(venta.tipoVenta as TipoVenta);
     setEditDescuento(venta.descuentoTotal);
     setEditDescuentoMonto(venta.descuentoMonto);
+    setEditAlicuotaIngresosBrutos(venta.alicuotaIngresosBrutos);
     setEditDescuentoModo(venta.descuentoMonto > 0 ? "MONTO" : "PCT");
     setEditObservaciones(venta.observaciones || "");
     setEditDiasCredito(venta.diasCredito || 30);
@@ -186,6 +188,7 @@ export default function VentaDetailPage() {
         tipoVenta: editTipoVenta,
         descuentoTotal: editDescuentoModo === "PCT" ? editDescuento : 0,
         descuentoMonto: editDescuentoModo === "MONTO" ? editDescuentoMonto : 0,
+        alicuotaIngresosBrutos: editAlicuotaIngresosBrutos,
         observaciones: editObservaciones || null,
         pagos: selectedPagos,
         ...(selectedPagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) && {
@@ -608,6 +611,22 @@ export default function VentaDetailPage() {
                   </div>
                 </div>
 
+                {/* Ingresos Brutos */}
+                <div className="space-y-2">
+                  <Label>Ingresos Brutos (%)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    value={editAlicuotaIngresosBrutos}
+                    onChange={(e) =>
+                      setEditAlicuotaIngresosBrutos(Number(e.target.value))
+                    }
+                    className="w-full sm:w-32"
+                  />
+                </div>
+
                 {/* Métodos de Pago */}
                 <div className="space-y-2">
                   <Label>Métodos de Pago</Label>
@@ -732,6 +751,15 @@ export default function VentaDetailPage() {
                   <p className="text-sm text-muted-foreground">Vencimiento</p>
                   <p className="font-medium">
                     {new Date(venta.fechaVencimiento).toLocaleDateString("es-AR")}
+                  </p>
+                </div>
+              )}
+              {venta.alicuotaIngresosBrutos > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground">Ingresos Brutos</p>
+                  <p className="font-medium">
+                    {venta.alicuotaIngresosBrutos}% &middot;{" "}
+                    {formatCurrency(venta.montoIngresosBrutos)}
                   </p>
                 </div>
               )}
@@ -986,6 +1014,16 @@ export default function VentaDetailPage() {
                     :
                   </span>
                   <span className="font-medium">-{formatCurrency(venta.totalDescuento)}</span>
+                </div>
+              )}
+              {venta.montoIngresosBrutos > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Ing. Brutos ({venta.alicuotaIngresosBrutos}%):
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(venta.montoIngresosBrutos)}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between border-t pt-2">

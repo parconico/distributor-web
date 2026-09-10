@@ -62,6 +62,9 @@ export default function NuevaVentaPage() {
   const [descuentoGeneral, setDescuentoGeneral] = useState(0);
   const [descuentoGeneralMonto, setDescuentoGeneralMonto] = useState(0);
   const [descuentoGeneralModo, setDescuentoGeneralModo] = useState<ModoDescuento>("PCT");
+  // Percepcion de Ingresos Brutos: la alicuota depende de la jurisdiccion del
+  // cliente, por eso se carga a mano en cada venta.
+  const [alicuotaIngresosBrutos, setAlicuotaIngresosBrutos] = useState(0);
   const [pagos, setPagos] = useState<{ metodoPago: MetodoPago; monto: number }[]>([
     { metodoPago: MetodoPago.CUENTA_CORRIENTE, monto: 0 },
   ]);
@@ -219,13 +222,28 @@ export default function NuevaVentaPage() {
     const monto = descuentoGeneralModo === "MONTO" ? descuentoGeneralMonto : 0;
     const totalConDescuento = aplicarDescuento(totalItems, pct, monto);
     const factor = totalItems > 0 ? totalConDescuento / totalItems : 1;
+
+    const subtotal = Math.round(subtotalItems * factor * 100) / 100;
+    const totalGravado = Math.round(totalItems * factor * 100) / 100;
+    // La percepcion se calcula sobre el neto y suma al total; no compensa el
+    // descuento, por eso el descuento se mide contra el total sin percepcion.
+    const montoIngresosBrutos =
+      Math.round(subtotal * (alicuotaIngresosBrutos / 100) * 100) / 100;
+
     return {
-      subtotal: Math.round(subtotalItems * factor * 100) / 100,
+      subtotal,
       totalIva: Math.round(totalIvaItems * factor * 100) / 100,
-      totalDescuento: Math.round((totalItems - totalItems * factor) * 100) / 100,
-      total: Math.round(totalItems * factor * 100) / 100,
+      totalDescuento: Math.round((totalItems - totalGravado) * 100) / 100,
+      montoIngresosBrutos,
+      total: Math.round((totalGravado + montoIngresosBrutos) * 100) / 100,
     };
-  }, [items, descuentoGeneral, descuentoGeneralMonto, descuentoGeneralModo]);
+  }, [
+    items,
+    descuentoGeneral,
+    descuentoGeneralMonto,
+    descuentoGeneralModo,
+    alicuotaIngresosBrutos,
+  ]);
 
   const handleSave = async () => {
     if (!clienteId) {
@@ -250,6 +268,7 @@ export default function NuevaVentaPage() {
         conIva,
         descuentoTotal: descuentoGeneralModo === "PCT" ? descuentoGeneral : 0,
         descuentoMonto: descuentoGeneralModo === "MONTO" ? descuentoGeneralMonto : 0,
+        alicuotaIngresosBrutos,
         pagos,
         diasCredito: pagos.some(p => p.metodoPago === MetodoPago.CUENTA_CORRIENTE) ? diasCredito : undefined,
         observaciones: observaciones || undefined,
@@ -414,6 +433,20 @@ export default function NuevaVentaPage() {
                   />
                 )}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Ing. Brutos %</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={alicuotaIngresosBrutos}
+                onChange={(e) =>
+                  setAlicuotaIngresosBrutos(Number(e.target.value))
+                }
+              />
             </div>
 
             <div className="space-y-3 lg:col-span-3">
@@ -665,6 +698,16 @@ export default function NuevaVentaPage() {
                     :
                   </span>
                   <span className="font-medium">-{formatCurrency(totals.totalDescuento)}</span>
+                </div>
+              )}
+              {totals.montoIngresosBrutos > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Ing. Brutos ({alicuotaIngresosBrutos}%):
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(totals.montoIngresosBrutos)}
+                  </span>
                 </div>
               )}
               <div className="flex justify-between border-t pt-2">
