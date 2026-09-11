@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sin conexión - Distribuidora</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fondo: #ffffff;
+        --texto: #0a0a0a;
+        --suave: #737373;
+        --marca: #1a1a2e;
+        --borde: #e5e5e5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fondo: #0a0a0a;
+          --texto: #fafafa;
+          --suave: #a3a3a3;
+          --marca: #fafafa;
+          --borde: #262626;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: var(--fondo);
+        color: var(--texto);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      .caja {
+        width: 100%;
+        max-width: 380px;
+        text-align: center;
+      }
+      .marca {
+        font-size: 20px;
+        font-weight: 700;
+        color: var(--marca);
+        margin-bottom: 32px;
+      }
+      h1 {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0;
+        color: var(--suave);
+        font-size: 15px;
+        line-height: 1.5;
+      }
+      button {
+        margin-top: 24px;
+        width: 100%;
+        padding: 12px 16px;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--fondo);
+        background: var(--marca);
+        border: 1px solid var(--marca);
+        border-radius: 8px;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="caja">
+      <div class="marca">Distribuidora</div>
+      <h1>Sin conexión</h1>
+      <p>
+        El sistema necesita internet para funcionar. Revisá tu conexión y volvé
+        a intentar.
+      </p>
+      <button onclick="location.reload()">Reintentar</button>
+    </div>
+  </body>
+</html>
