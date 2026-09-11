@@ -57,3 +57,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Instalada como app, el zoom queda deshabilitado. En el navegador no se toca:
+   ahi alguien puede necesitarlo para leer. */
+html.pwa {
+  /* Corta el doble tap para hacer zoom y, donde se respeta, tambien el pinch. */
+  touch-action: pan-x pan-y;
+}
+
+html.pwa body {
+  touch-action: pan-x pan-y;
+}
+
+/* iOS hace zoom solo al enfocar un control de menos de 16px. Con el pinch
+   bloqueado no habria forma de volver atras, asi que los subimos a 16. */
+html.pwa input,
+html.pwa textarea,
+html.pwa select,
+html.pwa button[role="combobox"] {
+  font-size: 16px;
+}
