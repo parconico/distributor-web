@@ -12,6 +12,7 @@ import {
 } from "@/types";
 import { formatEstadoRemito, estadoRemitoVariant } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { descargarPdf } from "@/lib/download";
 import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -46,7 +47,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Loader2, Trash2, Download } from "lucide-react";
 import { AxiosError } from "axios";
-import apiClient from "@/lib/api-client";
 
 export default function RemitoDetailPage() {
   const params = useParams();
@@ -313,11 +313,12 @@ export default function RemitoDetailPage() {
           {remito.estado !== "BORRADOR" && (
             <Button
               variant="outline"
-              onClick={async () => {
-                const res = await apiClient.get(`/remitos/${params.id}/pdf`, { responseType: 'blob' });
-                const url = URL.createObjectURL(res.data as Blob);
-                window.open(url);
-              }}
+              onClick={() =>
+                descargarPdf(
+                  `/remitos/${params.id}/pdf`,
+                  `remito-${remito.numero}.pdf`,
+                )
+              }
             >
               <Download className="mr-2 h-4 w-4" />
               Descargar PDF

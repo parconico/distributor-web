@@ -20,6 +20,7 @@ import {
   formatMetodoPago,
 } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { descargarPdf } from "@/lib/download";
 import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,7 +58,6 @@ import {
 import { RoleGate } from "@/components/shared/role-gate";
 import { ExternalLink, Loader2, Trash2, Download, Pencil, X, Save } from "lucide-react";
 import Link from "next/link";
-import apiClient from "@/lib/api-client";
 import { AxiosError } from "axios";
 
 type ModoDescuento = "PCT" | "MONTO";
@@ -460,11 +460,12 @@ export default function VentaDetailPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      const res = await apiClient.get(`/arca/tickets/${venta.ticketInterno!.id}/pdf`, { responseType: 'blob' });
-                      const url = URL.createObjectURL(res.data as Blob);
-                      window.open(url);
-                    }}
+                    onClick={() =>
+                      descargarPdf(
+                        `/arca/tickets/${venta.ticketInterno!.id}/pdf`,
+                        `ticket-${venta.ticketInterno!.numero}.pdf`,
+                      )
+                    }
                   >
                     <Download className="mr-2 h-4 w-4" />
                     Descargar Ticket

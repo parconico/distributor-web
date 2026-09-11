@@ -11,6 +11,7 @@ import {
   formatPuntoVentaNumero,
 } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
+import { descargarPdf } from "@/lib/download";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +24,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Loader2, Download } from "lucide-react";
-import apiClient from "@/lib/api-client";
 
 const alicuotaLabels: Record<number, string> = {
   3: "0%",
@@ -101,11 +101,12 @@ export default function ComprobanteDetailPage() {
         <div className="flex gap-2">
           <Button
             variant="outline"
-            onClick={async () => {
-              const res = await apiClient.get(`/arca/comprobantes/${params.id}/pdf`, { responseType: 'blob' });
-              const url = URL.createObjectURL(res.data as Blob);
-              window.open(url);
-            }}
+            onClick={() =>
+              descargarPdf(
+                `/arca/comprobantes/${params.id}/pdf`,
+                `${formatPuntoVentaNumero(comprobante.puntoVenta, comprobante.numero)}.pdf`,
+              )
+            }
           >
             <Download className="mr-2 h-4 w-4" />
             Descargar PDF
