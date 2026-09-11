@@ -49,6 +49,8 @@ export default function NuevaCompraPage() {
 
   const [proveedorId, setProveedorId] = useState("");
   const [observaciones, setObservaciones] = useState("");
+  // Percepcion de Ingresos Brutos que cobra el proveedor en su factura.
+  const [alicuotaIngresosBrutos, setAlicuotaIngresosBrutos] = useState(0);
 
   const {
     options: proveedores,
@@ -192,12 +194,19 @@ export default function NuevaCompraPage() {
     const subtotal = items.reduce((acc, i) => acc + i.subtotal, 0);
     const totalIva = items.reduce((acc, i) => acc + i.montoIva, 0);
     const total = items.reduce((acc, i) => acc + i.total, 0);
+
+    const neto = Math.round(subtotal * 100) / 100;
+    // La percepcion se calcula sobre el neto y suma al total, igual que en ventas.
+    const montoIngresosBrutos =
+      Math.round(neto * (alicuotaIngresosBrutos / 100) * 100) / 100;
+
     return {
-      subtotal: Math.round(subtotal * 100) / 100,
+      subtotal: neto,
       totalIva: Math.round(totalIva * 100) / 100,
-      total: Math.round(total * 100) / 100,
+      montoIngresosBrutos,
+      total: Math.round((total + montoIngresosBrutos) * 100) / 100,
     };
-  }, [items]);
+  }, [items, alicuotaIngresosBrutos]);
 
   const handleSave = async () => {
     if (!proveedorId) {
@@ -222,6 +231,7 @@ export default function NuevaCompraPage() {
       const compra = await post<{ id: string }>("/compras", {
         proveedorId,
         observaciones: observaciones || undefined,
+        alicuotaIngresosBrutos,
       });
 
       for (const item of items) {
@@ -282,6 +292,20 @@ export default function NuevaCompraPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Ing. Brutos %</Label>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={alicuotaIngresosBrutos}
+                onChange={(e) =>
+                  setAlicuotaIngresosBrutos(Number(e.target.value))
+                }
+                className="w-full sm:w-32"
+              />
             </div>
             <div className="space-y-2">
               <Label>Observaciones</Label>
@@ -456,6 +480,16 @@ export default function NuevaCompraPage() {
                 <span className="text-muted-foreground">Total IVA:</span>
                 <span className="font-medium">{formatCurrency(totals.totalIva)}</span>
               </div>
+              {totals.montoIngresosBrutos > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Ing. Brutos ({alicuotaIngresosBrutos}%):
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(totals.montoIngresosBrutos)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between border-t pt-2">
                 <span className="text-lg font-bold">Total:</span>
                 <span className="text-lg font-bold">{formatCurrency(totals.total)}</span>

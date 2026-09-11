@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { get, post, del } from "@/lib/api-client";
+import { get, post, patch, del } from "@/lib/api-client";
 import {
   Compra,
   EstadoCompra,
@@ -96,6 +96,45 @@ export default function CompraDetailPage() {
 
 
   const isDraft = compra?.estado === EstadoCompra.BORRADOR;
+
+  // Alicuota de Ingresos Brutos editable mientras la compra siga en borrador.
+  const [alicuotaIIBB, setAlicuotaIIBB] = useState("0");
+  const [guardandoIIBB, setGuardandoIIBB] = useState(false);
+
+  useEffect(() => {
+    if (compra) setAlicuotaIIBB(String(compra.alicuotaIngresosBrutos));
+  }, [compra]);
+
+  const handleGuardarIIBB = async () => {
+    const valor = Number(alicuotaIIBB);
+    if (!compra || Number.isNaN(valor) || valor < 0 || valor > 100) {
+      toast({
+        title: "Error",
+        description: "La alícuota debe estar entre 0 y 100",
+        variant: "destructive",
+      });
+      return;
+    }
+    setGuardandoIIBB(true);
+    try {
+      await patch(`/compras/${compra.id}`, {
+        alicuotaIngresosBrutos: valor,
+      });
+      toast({ title: "Ingresos Brutos actualizado" });
+      fetchCompra();
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description:
+          axiosError.response?.data?.message ??
+          "No se pudo actualizar Ingresos Brutos",
+        variant: "destructive",
+      });
+    } finally {
+      setGuardandoIIBB(false);
+    }
+  };
   const isConfirmada = compra?.estado === EstadoCompra.CONFIRMADA;
   const isRecibida = compra?.estado === EstadoCompra.RECIBIDA;
   const canAnular = isConfirmada || isRecibida;
@@ -386,6 +425,39 @@ export default function CompraDetailPage() {
                 {compra.proveedor?.razonSocial ?? "-"}
               </p>
             </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Ingresos Brutos</p>
+              {isDraft ? (
+                <div className="mt-1 flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.01}
+                    value={alicuotaIIBB}
+                    onChange={(e) => setAlicuotaIIBB(e.target.value)}
+                    className="h-8 w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">%</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleGuardarIIBB}
+                    disabled={guardandoIIBB}
+                  >
+                    {guardandoIIBB && (
+                      <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                    )}
+                    Guardar
+                  </Button>
+                </div>
+              ) : (
+                <p className="font-medium">
+                  {compra.alicuotaIngresosBrutos}% &middot;{" "}
+                  {formatCurrency(compra.montoIngresosBrutos)}
+                </p>
+              )}
+            </div>
             {compra.observaciones && (
               <div className="md:col-span-2">
                 <p className="text-sm text-muted-foreground">Observaciones</p>
@@ -543,6 +615,16 @@ export default function CompraDetailPage() {
                   {formatCurrency(compra.totalIva)}
                 </span>
               </div>
+              {compra.montoIngresosBrutos > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Ing. Brutos ({compra.alicuotaIngresosBrutos}%):
+                  </span>
+                  <span className="font-medium">
+                    {formatCurrency(compra.montoIngresosBrutos)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between border-t pt-2">
                 <span className="text-lg font-bold">Total:</span>
                 <span className="text-lg font-bold">

@@ -330,6 +330,8 @@ export interface Compra {
   proveedor?: Proveedor;
   subtotal: number;
   totalIva: number;
+  alicuotaIngresosBrutos: number;
+  montoIngresosBrutos: number;
   total: number;
   estado: EstadoCompra;
   observaciones?: string;
