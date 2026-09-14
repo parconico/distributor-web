@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/hooks/use-sidebar";
+import { tenant, moduleEnabled } from "@/lib/tenant";
 import { Role } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -273,8 +274,11 @@ function SidebarNav({
     setOrderedItems(applyOrder(defaultNavItems, savedOrder));
   }, []);
 
+  // Dos filtros: el rol del usuario y los módulos que tiene habilitados esta
+  // instancia. Un módulo apagado no aparece en el menú de ningún rol.
   const filteredItems = orderedItems.filter(
-    (item) => user && item.allowedRoles.includes(user.role)
+    (item) =>
+      user && item.allowedRoles.includes(user.role) && moduleEnabled(item.id)
   );
 
   const sensors = useSensors(
@@ -343,7 +347,7 @@ export function Sidebar() {
       >
         <div className="flex h-16 items-center justify-between border-b px-4">
           {!collapsed && (
-            <span className="text-lg font-bold text-primary">Distribuidora</span>
+            <span className="text-lg font-bold text-primary">{tenant.name}</span>
           )}
           <Button
             variant="ghost"
@@ -366,7 +370,7 @@ export function Sidebar() {
         <SheetContent side="left" className="w-72 p-0">
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
           <div className="flex h-16 items-center border-b px-4">
-            <span className="text-lg font-bold text-primary">Distribuidora</span>
+            <span className="text-lg font-bold text-primary">{tenant.name}</span>
           </div>
           <SidebarNav collapsed={false} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>

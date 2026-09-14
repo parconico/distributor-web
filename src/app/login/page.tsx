@@ -18,6 +18,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { tenant } from "@/lib/tenant";
 
 const loginSchema = z.object({
   email: z
@@ -71,7 +72,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold">Distribuidora</CardTitle>
+          <CardTitle className="text-2xl font-bold">{tenant.name}</CardTitle>
           <CardDescription>
             Ingrese sus credenciales para acceder al sistema
           </CardDescription>

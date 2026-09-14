@@ -5,14 +5,15 @@ import "./globals.css";
 import { AuthProvider } from "@/hooks/use-auth";
 import { Toaster } from "@/components/ui/toaster";
 import { PwaMode } from "@/components/shared/pwa-mode";
+import { tenant } from "@/lib/tenant";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Distribuidora - Sistema de Gestión",
-  description: "Sistema de gestión para distribuidora",
+  title: `${tenant.name} - Sistema de Gestión`,
+  description: tenant.description,
   manifest: "/manifest.json",
-  applicationName: "Distribuidora",
+  applicationName: tenant.name,
   icons: {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
     // Lo que iOS necesita para abrir la app a pantalla completa desde el icono
     // en vez de mostrarla dentro de Safari.
     capable: true,
-    title: "Distribuidora",
+    title: tenant.name,
     // "default" deja que iOS reserve la barra de estado. Con black-translucent
     // el contenido pasa por debajo del reloj y del notch, y el encabezado de la
     // app queda tapado salvo que se maqueten los safe-area insets.
