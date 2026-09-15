@@ -45,8 +45,12 @@ export enum UnidadMedida {
   KILOGRAMO = 'KILOGRAMO',
   LITRO = 'LITRO',
   METRO = 'METRO',
+  METRO_CUADRADO = 'METRO_CUADRADO',
   CAJA = 'CAJA',
   PACK = 'PACK',
+  ROLLO = 'ROLLO',
+  TACHO = 'TACHO',
+  BOLSA = 'BOLSA',
 }
 
 export enum ListaPrecio {

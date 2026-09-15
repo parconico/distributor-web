@@ -36,8 +36,12 @@ const UNIDAD_MEDIDA_LABELS: Record<UnidadMedida, string> = {
   [UnidadMedida.KILOGRAMO]: "Kilogramo",
   [UnidadMedida.LITRO]: "Litro",
   [UnidadMedida.METRO]: "Metro",
+  [UnidadMedida.METRO_CUADRADO]: "Metro cuadrado",
   [UnidadMedida.CAJA]: "Caja",
   [UnidadMedida.PACK]: "Pack",
+  [UnidadMedida.ROLLO]: "Rollo",
+  [UnidadMedida.TACHO]: "Tacho",
+  [UnidadMedida.BOLSA]: "Bolsa",
 };
 
 const ALICUOTA_IVA_OPTIONS = [0, 2.5, 5, 10.5, 21, 27];
