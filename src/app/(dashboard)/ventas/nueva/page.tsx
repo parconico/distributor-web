@@ -32,6 +32,10 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Trash2 } from "lucide-react";
 import { AxiosError } from "axios";
 
+// Valor centinela del selector: la venta no tiene comprador registrado y se
+// imputa al consumidor final generico. Radix no acepta un item con value "".
+const MOSTRADOR = "__mostrador__";
+
 type ModoDescuento = "PCT" | "MONTO";
 
 interface LocalItem {
@@ -56,6 +60,7 @@ export default function NuevaVentaPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [clienteId, setClienteId] = useState("");
+  const esMostrador = !clienteId || clienteId === MOSTRADOR;
   const [listaPrecio, setListaPrecio] = useState<ListaPrecio | "">("");
   const [tipoVenta, setTipoVenta] = useState<"EN_BLANCO" | "EN_NEGRO">("EN_BLANCO");
   const [conIva, setConIva] = useState(true);
@@ -97,6 +102,21 @@ export default function NuevaVentaPage() {
   const handleClienteChange = useCallback(
     (id: string) => {
       setClienteId(id);
+
+      // Venta de mostrador: no hay ficha de donde sacar la lista, y tampoco
+      // hay a quien cobrarle a cuenta corriente.
+      if (id === MOSTRADOR) {
+        setListaPrecio(ListaPrecio.LISTA_1);
+        setPagos((prev) =>
+          prev.map((p) =>
+            p.metodoPago === MetodoPago.CUENTA_CORRIENTE
+              ? { ...p, metodoPago: MetodoPago.EFECTIVO }
+              : p
+          )
+        );
+        return;
+      }
+
       const cliente = clientes.find((c) => c.id === id);
       if (cliente) {
         setListaPrecio(cliente.listaPrecio);
@@ -246,10 +266,6 @@ export default function NuevaVentaPage() {
   ]);
 
   const handleSave = async () => {
-    if (!clienteId) {
-      toast({ title: "Error", description: "Debe seleccionar un cliente", variant: "destructive" });
-      return;
-    }
     if (!listaPrecio) {
       toast({ title: "Error", description: "Debe seleccionar una lista de precio", variant: "destructive" });
       return;
@@ -261,8 +277,10 @@ export default function NuevaVentaPage() {
 
     setIsSaving(true);
     try {
-      const venta = await post<{ id: string }>("/ventas", {
-        clienteId,
+      const venta = await post<{ id: string; clienteId: string }>("/ventas", {
+        // Sin cliente elegido la venta se imputa al consumidor final generico,
+        // que resuelve el backend.
+        clienteId: esMostrador ? undefined : clienteId,
         listaPrecio,
         tipoVenta,
         conIva,
@@ -283,8 +301,10 @@ export default function NuevaVentaPage() {
         });
       }
 
+      // El remito va al mismo cliente que quedo en la venta, que en una venta
+      // de mostrador es el consumidor final generico.
       const remito = await post<{ id: string }>("/remitos", {
-        clienteId,
+        clienteId: venta.clienteId,
         ventaId: venta.id,
       });
       for (const item of items) {
@@ -321,7 +341,7 @@ export default function NuevaVentaPage() {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
             <div className="space-y-2">
-              <Label>Cliente *</Label>
+              <Label>Cliente</Label>
               <Select value={clienteId} onValueChange={handleClienteChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar cliente" />
@@ -335,6 +355,9 @@ export default function NuevaVentaPage() {
                       className="mb-2"
                     />
                   </div>
+                  <SelectItem value={MOSTRADOR}>
+                    Consumidor final (mostrador)
+                  </SelectItem>
                   {clientes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.razonSocial}
