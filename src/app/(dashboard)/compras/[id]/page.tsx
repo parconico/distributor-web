@@ -16,15 +16,9 @@ import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -477,29 +471,16 @@ export default function CompraDetailPage() {
             <div className="flex flex-wrap items-end gap-4">
               <div className="flex-1 min-w-[200px] space-y-2">
                 <Label>Producto</Label>
-                <Select
+                <SearchableSelect
                   value={selectedProductoId}
                   onValueChange={setSelectedProductoId}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Buscar producto..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="p-2">
-                      <Input
-                        placeholder="Buscar por nombre o código..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="mb-2"
-                      />
-                    </div>
-                    {productos.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.codigo} - {p.nombre} (IVA: {p.alicuotaIva}%)
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  options={productos.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre} (IVA: ${p.alicuotaIva}%)` }))}
+                  search={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  placeholder="Buscar producto..."
+                  searchPlaceholder="Buscar por nombre o código..."
+                  ocultas={productosOcultos}
+                />
               </div>
               <div className="w-28 space-y-2">
                 <Label>Cantidad</Label>

@@ -10,6 +10,7 @@ import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -322,31 +323,16 @@ export default function NuevaVentaPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-6">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Select value={clienteId} onValueChange={handleClienteChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar por nombre o documento..."
-                      value={clienteSearch}
-                      onChange={(e) => setClienteSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.razonSocial}
-                    </SelectItem>
-                  ))}
-                  {clientesOcultos > 0 && (
-                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                      +{clientesOcultos} más. Afiná la búsqueda.
-                    </p>
-                  )}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={clienteId}
+                onValueChange={handleClienteChange}
+                options={clientes.map((c) => ({ value: c.id, label: c.razonSocial }))}
+                search={clienteSearch}
+                onSearchChange={setClienteSearch}
+                placeholder="Seleccionar cliente"
+                searchPlaceholder="Buscar por nombre o documento..."
+                ocultas={clientesOcultos}
+              />
             </div>
 
             <div className="space-y-2">
@@ -527,39 +513,19 @@ export default function NuevaVentaPage() {
           <div className="flex items-end gap-4">
             <div className="flex-1 space-y-2">
               <Label>Producto</Label>
-              <Select
+              <SearchableSelect
                 value={selectedProductoId}
                 onValueChange={(id) => {
                   setSelectedProductoId(id);
                   setSelectedProducto(productos.find((p) => p.id === id) ?? null);
                 }}
-              >
-                <SelectTrigger>
-                  {/* Sin children: Radix usa este span como contenedor de portal
-                      para la opcion elegida y escribirle texto encima rompe. */}
-                  <SelectValue placeholder="Buscar producto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar por nombre o codigo..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {productos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre} (Stock: {p.stockActual})
-                    </SelectItem>
-                  ))}
-                  {productosOcultos > 0 && (
-                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                      +{productosOcultos} más. Afiná la búsqueda.
-                    </p>
-                  )}
-                </SelectContent>
-              </Select>
+                options={productos.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre} (Stock: ${p.stockActual})` }))}
+                search={searchTerm}
+                onSearchChange={setSearchTerm}
+                placeholder="Buscar producto..."
+                searchPlaceholder="Buscar por nombre o codigo..."
+                ocultas={productosOcultos}
+              />
             </div>
 
             {selectedProducto && (

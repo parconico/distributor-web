@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -200,27 +201,18 @@ export default function ReporteVentasPage() {
             </div>
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar cliente..."
-                      value={clienteSearch}
-                      onChange={(e) => setClienteSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.razonSocial}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={clienteId}
+                onValueChange={setClienteId}
+                options={[
+                  { value: "all", label: "Todos" },
+                  ...clientes.map((c) => ({ value: c.id, label: c.razonSocial })),
+                ]}
+                search={clienteSearch}
+                onSearchChange={setClienteSearch}
+                placeholder="Todos"
+                searchPlaceholder="Buscar cliente..."
+              />
             </div>
             <div className="space-y-2">
               <Label>Vendedor</Label>

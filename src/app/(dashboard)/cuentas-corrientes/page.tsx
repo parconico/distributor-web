@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -278,28 +279,17 @@ export default function CuentasCorrientesPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>Cliente</Label>
-              <Select value={selectedClienteId} onValueChange={setSelectedClienteId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar cliente..."
-                      value={clienteSearch}
-                      onChange={(e) => setClienteSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {clientes
-                    .filter((c) => !clientesConCuenta.has(c.id))
-                    .map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.razonSocial}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={selectedClienteId}
+                onValueChange={setSelectedClienteId}
+                options={clientes
+                  .filter((c) => !clientesConCuenta.has(c.id))
+                  .map((c) => ({ value: c.id, label: c.razonSocial }))}
+                search={clienteSearch}
+                onSearchChange={setClienteSearch}
+                placeholder="Seleccionar cliente..."
+                searchPlaceholder="Buscar cliente..."
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="saldo-inicial">Saldo a Favor Inicial (opcional)</Label>

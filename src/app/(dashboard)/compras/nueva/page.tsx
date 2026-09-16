@@ -10,16 +10,10 @@ import { toast } from "@/hooks/use-toast";
 import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -272,26 +266,16 @@ export default function NuevaCompraPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label>Proveedor *</Label>
-              <Select value={proveedorId} onValueChange={setProveedorId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar proveedor..."
-                      value={proveedorSearch}
-                      onChange={(e) => setProveedorSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {proveedores.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.razonSocial}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={proveedorId}
+                onValueChange={setProveedorId}
+                options={proveedores.map((p) => ({ value: p.id, label: p.razonSocial }))}
+                search={proveedorSearch}
+                onSearchChange={setProveedorSearch}
+                placeholder="Seleccionar proveedor"
+                searchPlaceholder="Buscar proveedor..."
+                ocultas={proveedoresOcultos}
+              />
             </div>
             <div className="space-y-2">
               <Label>Ing. Brutos %</Label>
@@ -328,26 +312,16 @@ export default function NuevaCompraPage() {
           <div className="flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[200px] space-y-2">
               <Label>Producto</Label>
-              <Select value={selectedProductoId} onValueChange={setSelectedProductoId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Buscar producto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar por nombre o código..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {productos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre} (IVA: {p.alicuotaIva}%)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={selectedProductoId}
+                onValueChange={setSelectedProductoId}
+                options={productos.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre} (IVA: ${p.alicuotaIva}%)` }))}
+                search={searchTerm}
+                onSearchChange={setSearchTerm}
+                placeholder="Buscar producto..."
+                searchPlaceholder="Buscar por nombre o código..."
+                ocultas={productosOcultos}
+              />
             </div>
 
             <div className="w-28 space-y-2">

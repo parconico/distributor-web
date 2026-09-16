@@ -16,6 +16,7 @@ import { RoleGate } from "@/components/shared/role-gate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -315,26 +316,15 @@ export default function ComprasPage() {
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label htmlFor="proveedor">Proveedor</Label>
-                <Select value={proveedorId} onValueChange={setProveedorId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccionar proveedor..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="p-2">
-                      <Input
-                        placeholder="Buscar proveedor..."
-                        value={proveedorSearch}
-                        onChange={(e) => setProveedorSearch(e.target.value)}
-                        className="mb-2"
-                      />
-                    </div>
-                    {proveedores.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.razonSocial}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={proveedorId}
+                  onValueChange={setProveedorId}
+                  options={proveedores.map((p) => ({ value: p.id, label: p.razonSocial }))}
+                  search={proveedorSearch}
+                  onSearchChange={setProveedorSearch}
+                  placeholder="Seleccionar proveedor..."
+                  searchPlaceholder="Buscar proveedor..."
+                />
               </div>
 
               <div className="space-y-2">

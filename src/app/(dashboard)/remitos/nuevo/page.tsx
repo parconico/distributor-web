@@ -14,6 +14,7 @@ import { toast } from "@/hooks/use-toast";
 import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -199,29 +200,19 @@ export default function NuevoRemitoPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <div className="space-y-2">
               <Label>Cliente *</Label>
-              <Select value={clienteId} onValueChange={(v) => {
+              <SearchableSelect
+                value={clienteId}
+                onValueChange={(v) => {
                 setClienteId(v);
                 setVentaId("");
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar cliente..."
-                      value={clienteSearch}
-                      onChange={(e) => setClienteSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {clientes.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.razonSocial}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              }}
+                options={clientes.map((c) => ({ value: c.id, label: c.razonSocial }))}
+                search={clienteSearch}
+                onSearchChange={setClienteSearch}
+                placeholder="Seleccionar cliente"
+                searchPlaceholder="Buscar cliente..."
+                ocultas={clientesOcultos}
+              />
             </div>
 
             <div className="space-y-2">
@@ -267,26 +258,16 @@ export default function NuevoRemitoPage() {
           <div className="flex items-end gap-4">
             <div className="flex-1 space-y-2">
               <Label>Producto</Label>
-              <Select value={selectedProductoId} onValueChange={setSelectedProductoId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Buscar producto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar por nombre o código..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {productos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre} (Stock: {p.stockActual})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={selectedProductoId}
+                onValueChange={setSelectedProductoId}
+                options={productos.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre} (Stock: ${p.stockActual})` }))}
+                search={searchTerm}
+                onSearchChange={setSearchTerm}
+                placeholder="Buscar producto..."
+                searchPlaceholder="Buscar por nombre o código..."
+                ocultas={productosOcultos}
+              />
             </div>
 
             <div className="w-28 space-y-2">

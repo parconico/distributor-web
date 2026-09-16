@@ -7,13 +7,12 @@ import { z } from "zod";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -178,36 +177,23 @@ export function ProductoForm({ producto }: ProductoFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="subfamiliaId">Subfamilia *</Label>
-              <Select
+              <SearchableSelect
                 value={subfamiliaIdValue}
                 onValueChange={(val) =>
                   setValue("subfamiliaId", val, { shouldValidate: true })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar subfamilia" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar familia..."
-                      value={familiaSearch}
-                      onChange={(e) => setFamiliaSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {familias.map((familia) => (
-                    <SelectGroup key={familia.id}>
-                      <SelectLabel>{familia.nombre}</SelectLabel>
-                      {familia.subfamilias?.map((sub) => (
-                        <SelectItem key={sub.id} value={sub.id}>
-                          {familia.nombre} &gt; {sub.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
+                options={familias.flatMap((familia) =>
+                  (familia.subfamilias ?? []).map((sub) => ({
+                    value: sub.id,
+                    label: `${familia.nombre} > ${sub.nombre}`,
+                    group: familia.nombre,
+                  }))
+                )}
+                search={familiaSearch}
+                onSearchChange={setFamiliaSearch}
+                placeholder="Seleccionar subfamilia"
+                searchPlaceholder="Buscar familia..."
+              />
               {errors.subfamiliaId && (
                 <p className="text-sm text-destructive">
                   {errors.subfamiliaId.message}
@@ -217,39 +203,23 @@ export function ProductoForm({ producto }: ProductoFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="proveedorId">Proveedor</Label>
-              <Select
+              <SearchableSelect
                 value={proveedorIdValue}
                 onValueChange={(val) =>
                   setValue("proveedorId", val === "_none" ? "" : val, {
                     shouldValidate: true,
                   })
                 }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar proveedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar proveedor..."
-                      value={proveedorSearch}
-                      onChange={(e) => setProveedorSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  <SelectItem value="_none">Sin proveedor</SelectItem>
-                  {proveedores.map((prov) => (
-                    <SelectItem key={prov.id} value={prov.id}>
-                      {prov.razonSocial}
-                    </SelectItem>
-                  ))}
-                  {proveedoresOcultos > 0 && (
-                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                      +{proveedoresOcultos} más. Afiná la búsqueda.
-                    </p>
-                  )}
-                </SelectContent>
-              </Select>
+                options={[
+                  { value: "_none", label: "Sin proveedor" },
+                  ...proveedores.map((prov) => ({ value: prov.id, label: prov.razonSocial })),
+                ]}
+                search={proveedorSearch}
+                onSearchChange={setProveedorSearch}
+                placeholder="Seleccionar proveedor"
+                searchPlaceholder="Buscar proveedor..."
+                ocultas={proveedoresOcultos}
+              />
             </div>
 
             <div className="space-y-2">

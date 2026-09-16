@@ -8,15 +8,9 @@ import { toast } from "@/hooks/use-toast";
 import { useRemoteOptions } from "@/hooks/use-remote-options";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 import { AxiosError } from "axios";
 
@@ -93,39 +87,19 @@ export default function EgresoStockPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label>Producto *</Label>
-              <Select
+              <SearchableSelect
                 value={productoId}
                 onValueChange={(id) => {
                   setProductoId(id);
                   setProducto(productos.find((p) => p.id === id) ?? null);
                 }}
-              >
-                <SelectTrigger>
-                  {/* Sin children: Radix usa este span como contenedor de portal
-                      para la opcion elegida y escribirle texto encima rompe. */}
-                  <SelectValue placeholder="Seleccionar producto" />
-                </SelectTrigger>
-                <SelectContent>
-                  <div className="p-2">
-                    <Input
-                      placeholder="Buscar por nombre o código..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mb-2"
-                    />
-                  </div>
-                  {productos.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.codigo} - {p.nombre} (Stock actual: {p.stockActual})
-                    </SelectItem>
-                  ))}
-                  {productosOcultos > 0 && (
-                    <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                      +{productosOcultos} más. Afiná la búsqueda.
-                    </p>
-                  )}
-                </SelectContent>
-              </Select>
+                options={productos.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre} (Stock actual: ${p.stockActual})` }))}
+                search={searchTerm}
+                onSearchChange={setSearchTerm}
+                placeholder="Seleccionar producto"
+                searchPlaceholder="Buscar por nombre o código..."
+                ocultas={productosOcultos}
+              />
               {stockDisponible !== null && (
                 <p className="text-sm text-muted-foreground">
                   Stock disponible: {stockDisponible}

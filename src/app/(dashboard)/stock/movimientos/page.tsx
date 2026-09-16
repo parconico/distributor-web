@@ -11,7 +11,7 @@ import {
 } from "@/types";
 import { formatTipoMovimiento } from "@/lib/formatters";
 import { toast } from "@/hooks/use-toast";
-import { Input } from "@/components/ui/input";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PaginatedTable } from "@/components/tables/paginated-table";
 import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { useRemoteOptions } from "@/hooks/use-remote-options";
@@ -133,27 +133,19 @@ export default function MovimientosStockPage() {
         <h1 className="text-2xl font-bold">Movimientos de Stock</h1>
       </div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-        <Select value={productoFilter} onValueChange={setProductoFilter}>
-          <SelectTrigger className="w-full sm:w-[250px]">
-            <SelectValue placeholder="Filtrar por producto" />
-          </SelectTrigger>
-          <SelectContent>
-            <div className="p-2">
-              <Input
-                placeholder="Buscar producto..."
-                value={productoSearch}
-                onChange={(e) => setProductoSearch(e.target.value)}
-                className="mb-2"
-              />
-            </div>
-            <SelectItem value="all">Todos los productos</SelectItem>
-            {productos.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.codigo} - {p.nombre}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={productoFilter}
+          onValueChange={setProductoFilter}
+          options={[
+            { value: "all", label: "Todos los productos" },
+            ...productos.map((p) => ({ value: p.id, label: `${p.codigo} - ${p.nombre}` })),
+          ]}
+          search={productoSearch}
+          onSearchChange={setProductoSearch}
+          placeholder="Filtrar por producto"
+          searchPlaceholder="Buscar producto..."
+          className="w-full sm:w-[250px]"
+        />
         <Select value={tipoFilter} onValueChange={setTipoFilter}>
           <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Filtrar por tipo" />
