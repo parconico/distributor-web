@@ -41,7 +41,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { tenant, moduleEnabled } from "@/lib/tenant";
+import { moduleEnabled } from "@/lib/tenant";
+import { Marca } from "@/components/layout/marca";
 import { Role } from "@/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -347,7 +348,7 @@ export function Sidebar() {
       >
         <div className="flex h-16 items-center justify-between border-b px-4">
           {!collapsed && (
-            <span className="text-lg font-bold text-primary">{tenant.name}</span>
+            <Marca />
           )}
           <Button
             variant="ghost"
@@ -370,7 +371,7 @@ export function Sidebar() {
         <SheetContent side="left" className="w-72 p-0">
           <SheetTitle className="sr-only">Menú de navegación</SheetTitle>
           <div className="flex h-16 items-center border-b px-4">
-            <span className="text-lg font-bold text-primary">{tenant.name}</span>
+            <Marca />
           </div>
           <SidebarNav collapsed={false} onNavigate={() => setMobileOpen(false)} />
         </SheetContent>

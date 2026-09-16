@@ -16,23 +16,23 @@ export function GET() {
     display: "standalone",
     orientation: "portrait",
     background_color: "#ffffff",
-    theme_color: "#1a1a2e",
+    theme_color: tenant.themeColor,
     lang: "es-AR",
     icons: [
       {
-        src: "/icon-192.png",
+        src: `${tenant.brandPath}/icon-192.png`,
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-512.png",
+        src: `${tenant.brandPath}/icon-512.png`,
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icon-maskable-512.png",
+        src: `${tenant.brandPath}/icon-maskable-512.png`,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

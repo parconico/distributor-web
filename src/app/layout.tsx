@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
   applicationName: tenant.name,
   icons: {
-    icon: "/favicon.png",
-    apple: "/apple-touch-icon.png",
+    icon: `${tenant.brandPath}/favicon.png`,
+    apple: `${tenant.brandPath}/apple-touch-icon.png`,
   },
   appleWebApp: {
     // Lo que iOS necesita para abrir la app a pantalla completa desde el icono
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1a1a2e",
+  themeColor: tenant.themeColor,
   width: "device-width",
   initialScale: 1,
 };
