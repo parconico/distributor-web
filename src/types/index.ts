@@ -361,6 +361,8 @@ export interface ArcaConfig {
   id: string;
   cuit: string;
   puntoVenta: number;
+  // Base64 del PNG que se imprime en el encabezado de la factura.
+  logo?: string | null;
   environment: string;
 }
 

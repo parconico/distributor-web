@@ -139,6 +139,60 @@ function ExistingConfigCard({
     success: boolean;
     message: string;
   } | null>(null);
+  const [logo, setLogo] = useState<string | null>(config.logo ?? null);
+  const [isLogoSaving, setIsLogoSaving] = useState(false);
+
+  // Guarda el logo sin tocar el resto: el backend conserva el certificado y la
+  // clave cuando no vienen en el pedido.
+  const guardarLogo = async (base64: string | null) => {
+    setIsLogoSaving(true);
+    try {
+      await post("/arca/config", {
+        cuit: config.cuit,
+        puntoVenta: config.puntoVenta,
+        environment: config.environment,
+        logo: base64 ?? "",
+      });
+      setLogo(base64);
+      toast({ title: base64 ? "Logo actualizado" : "Logo eliminado" });
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description:
+          axiosError.response?.data?.message ?? "No se pudo guardar el logo",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLogoSaving(false);
+    }
+  };
+
+  const handleLogoFile = (archivo: File) => {
+    if (!archivo.type.startsWith("image/")) {
+      toast({
+        title: "Formato no válido",
+        description: "El logo tiene que ser una imagen PNG o JPG.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (archivo.size > 1024 * 1024) {
+      toast({
+        title: "Imagen muy pesada",
+        description: "Usá una de hasta 1 MB. Con 600 px de ancho alcanza.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const lector = new FileReader();
+    lector.onload = () => {
+      const resultado = String(lector.result);
+      // Se guarda solo el base64, sin el prefijo "data:image/png;base64,".
+      void guardarLogo(resultado.slice(resultado.indexOf(",") + 1));
+    };
+    lector.readAsDataURL(archivo);
+  };
 
   const handleTest = async () => {
     setIsTesting(true);
@@ -200,6 +254,51 @@ function ExistingConfigCard({
             <span className="font-medium">
               {config.environment === "prod" ? "Producción" : "Desarrollo"}
             </span>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-2 border-t pt-4">
+          <Label>Logo de la factura</Label>
+          <p className="text-xs text-muted-foreground">
+            Se imprime arriba a la izquierda del PDF. PNG con fondo
+            transparente, de hasta 1 MB.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {logo ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={`data:image/png;base64,${logo}`}
+                alt="Logo de la factura"
+                className="h-10 w-auto max-w-[180px] object-contain"
+              />
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                Sin logo cargado
+              </span>
+            )}
+            <Input
+              id="arca-logo"
+              type="file"
+              accept="image/png,image/jpeg"
+              className="max-w-xs"
+              disabled={isLogoSaving}
+              onChange={(e) => {
+                const archivo = e.target.files?.[0];
+                if (archivo) handleLogoFile(archivo);
+                e.target.value = "";
+              }}
+            />
+            {logo && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isLogoSaving}
+                onClick={() => void guardarLogo(null)}
+              >
+                Quitar
+              </Button>
+            )}
+            {isLogoSaving && <Loader2 className="h-4 w-4 animate-spin" />}
           </div>
         </div>
 
