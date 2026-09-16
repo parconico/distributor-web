@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { get, post, del } from "@/lib/api-client";
-import { ArcaConfig } from "@/types";
+import { ArcaConfig, ContribuyenteArca } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -142,6 +142,84 @@ function ExistingConfigCard({
   const [logo, setLogo] = useState<string | null>(config.logo ?? null);
   const [isLogoSaving, setIsLogoSaving] = useState(false);
 
+  // Datos del emisor que se imprimen en la factura.
+  const [razonSocial, setRazonSocial] = useState(config.razonSocial ?? "");
+  const [domicilio, setDomicilio] = useState(config.domicilio ?? "");
+  const [condicionIva, setCondicionIva] = useState(
+    config.condicionIva ?? "RESPONSABLE_INSCRIPTO"
+  );
+  const [ingresosBrutos, setIngresosBrutos] = useState(
+    config.ingresosBrutos ?? ""
+  );
+  const [inicioActividades, setInicioActividades] = useState(
+    config.inicioActividades ? config.inicioActividades.slice(0, 10) : ""
+  );
+  const [isEmisorSaving, setIsEmisorSaving] = useState(false);
+  const [isBuscando, setIsBuscando] = useState(false);
+
+  const guardarEmisor = async () => {
+    setIsEmisorSaving(true);
+    try {
+      await post("/arca/config", {
+        cuit: config.cuit,
+        puntoVenta: config.puntoVenta,
+        environment: config.environment,
+        razonSocial,
+        domicilio,
+        condicionIva,
+        ingresosBrutos,
+        inicioActividades,
+      });
+      toast({ title: "Datos del emisor guardados" });
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "Error",
+        description:
+          axiosError.response?.data?.message ?? "No se pudieron guardar",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEmisorSaving(false);
+    }
+  };
+
+  // El padrón de ARCA tiene la razón social, el domicilio y la condición de
+  // IVA. Ingresos Brutos es provincial y la fecha de inicio no viene, así que
+  // esos dos se cargan a mano.
+  const traerDeArca = async () => {
+    setIsBuscando(true);
+    try {
+      const datos = await post<ContribuyenteArca>(
+        "/arca/consultar-contribuyente",
+        { documento: config.cuit, tipoDocumento: "CUIT" }
+      );
+      if (datos.razonSocial) setRazonSocial(datos.razonSocial);
+      const partes = [
+        datos.direccion,
+        datos.localidad,
+        datos.provincia,
+        datos.codigoPostal ? `CP ${datos.codigoPostal}` : null,
+      ].filter(Boolean);
+      if (partes.length > 0) setDomicilio(partes.join(", "));
+      if (datos.condicionIva) setCondicionIva(datos.condicionIva);
+      toast({
+        title: "Datos traídos de ARCA",
+        description: "Revisalos y tocá Guardar.",
+      });
+    } catch (error) {
+      const axiosError = error as AxiosError<{ message: string }>;
+      toast({
+        title: "No se pudo consultar",
+        description:
+          axiosError.response?.data?.message ?? "El padrón no respondió",
+        variant: "destructive",
+      });
+    } finally {
+      setIsBuscando(false);
+    }
+  };
+
   // Guarda el logo sin tocar el resto: el backend conserva el certificado y la
   // clave cuando no vienen en el pedido.
   const guardarLogo = async (base64: string | null) => {
@@ -255,6 +333,91 @@ function ExistingConfigCard({
               {config.environment === "prod" ? "Producción" : "Desarrollo"}
             </span>
           </div>
+        </div>
+
+        <div className="mt-4 space-y-3 border-t pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Label>Datos del emisor en la factura</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={traerDeArca}
+              disabled={isBuscando}
+            >
+              {isBuscando && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Traer de ARCA
+            </Button>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="emisor-razon" className="text-xs font-normal text-muted-foreground">
+                Razón social
+              </Label>
+              <Input
+                id="emisor-razon"
+                value={razonSocial}
+                onChange={(e) => setRazonSocial(e.target.value)}
+                placeholder="Como figura en ARCA"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="emisor-domicilio" className="text-xs font-normal text-muted-foreground">
+                Domicilio comercial
+              </Label>
+              <Input
+                id="emisor-domicilio"
+                value={domicilio}
+                onChange={(e) => setDomicilio(e.target.value)}
+                placeholder="Calle, número, localidad, provincia"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="emisor-condicion" className="text-xs font-normal text-muted-foreground">
+                Condición frente al IVA
+              </Label>
+              <Select value={condicionIva} onValueChange={setCondicionIva}>
+                <SelectTrigger id="emisor-condicion">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="RESPONSABLE_INSCRIPTO">Responsable Inscripto</SelectItem>
+                  <SelectItem value="MONOTRIBUTISTA">Monotributista</SelectItem>
+                  <SelectItem value="EXENTO">Exento</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Decide si se emite factura A y B o factura C.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="emisor-iibb" className="text-xs font-normal text-muted-foreground">
+                Ingresos Brutos
+              </Label>
+              <Input
+                id="emisor-iibb"
+                value={ingresosBrutos}
+                onChange={(e) => setIngresosBrutos(e.target.value)}
+                placeholder="Número de inscripción"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="emisor-inicio" className="text-xs font-normal text-muted-foreground">
+                Inicio de actividades
+              </Label>
+              <Input
+                id="emisor-inicio"
+                type="date"
+                value={inicioActividades}
+                onChange={(e) => setInicioActividades(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <Button size="sm" onClick={guardarEmisor} disabled={isEmisorSaving}>
+            {isEmisorSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Guardar datos del emisor
+          </Button>
         </div>
 
         <div className="mt-4 space-y-2 border-t pt-4">

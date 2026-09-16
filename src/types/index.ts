@@ -363,6 +363,12 @@ export interface ArcaConfig {
   puntoVenta: number;
   // Base64 del PNG que se imprime en el encabezado de la factura.
   logo?: string | null;
+  // Datos del emisor impresos en el comprobante.
+  razonSocial?: string | null;
+  domicilio?: string | null;
+  condicionIva?: string | null;
+  ingresosBrutos?: string | null;
+  inicioActividades?: string | null;
   environment: string;
 }
 
