@@ -1,15 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { get } from "@/lib/api-client";
 import { Producto, PaginatedResponse } from "@/types";
 import { toast } from "@/hooks/use-toast";
+import { downloadFile } from "@/lib/download";
 import { PaginatedTable } from "@/components/tables/paginated-table";
 import { usePaginatedList } from "@/hooks/use-paginated-list";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, PackagePlus, PackageMinus, History } from "lucide-react";
+import {
+  Loader2,
+  PackagePlus,
+  PackageMinus,
+  History,
+  Download,
+} from "lucide-react";
 
 export default function StockPage() {
   const {
@@ -25,6 +33,31 @@ export default function StockPage() {
   } = usePaginatedList<Producto>("/stock", {
     errorMessage: "No se pudo cargar el stock",
   });
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Baja todos los productos, no solo la pagina visible. Si hay una busqueda
+  // escrita, la descarga se limita a lo que coincide.
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      const params = new URLSearchParams();
+      if (search.trim()) params.set("search", search.trim());
+      const query = params.toString();
+      await downloadFile(
+        `/stock/excel${query ? `?${query}` : ""}`,
+        `stock-${new Date().toISOString().slice(0, 10)}.xlsx`,
+      );
+    } catch {
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el stock",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const columns: ColumnDef<Producto>[] = [
     {
@@ -67,6 +100,18 @@ export default function StockPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Stock</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={handleExport}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-2 h-4 w-4" />
+            )}
+            Descargar Excel
+          </Button>
           <Button asChild variant="outline">
             <Link href="/stock/movimientos">
               <History className="mr-2 h-4 w-4" />
