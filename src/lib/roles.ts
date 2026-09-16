@@ -14,7 +14,7 @@ export function formatRole(role: Role | string): string {
 // que adivinarlo. Sale de los permisos que declara cada pantalla.
 export const DESCRIPCION_ROL: Record<string, string> = {
   ADMIN: "Acceso total, incluida la configuración de facturación y los usuarios.",
-  VENDEDOR: "Vende, consulta clientes, productos y precios. No ve compras ni reportes contables.",
+  VENDEDOR: "Carga ventas, maneja clientes y consulta el stock. No ve precios, remitos, cuentas corrientes ni reportes.",
   DEPOSITO: "Maneja stock, remitos, compras y proveedores. No vende ni factura.",
   CONTADOR: "Consulta ventas, compras, cuentas corrientes, facturación y reportes.",
 };

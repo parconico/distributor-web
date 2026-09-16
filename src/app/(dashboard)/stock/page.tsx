@@ -4,11 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { ColumnDef } from "@tanstack/react-table";
 import { get } from "@/lib/api-client";
-import { Producto, PaginatedResponse } from "@/types";
+import { Producto, PaginatedResponse, Role } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { downloadFile } from "@/lib/download";
 import { PaginatedTable } from "@/components/tables/paginated-table";
 import { usePaginatedList } from "@/hooks/use-paginated-list";
+import { RoleGate } from "@/components/shared/role-gate";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -112,24 +113,27 @@ export default function StockPage() {
             )}
             Descargar Excel
           </Button>
-          <Button asChild variant="outline">
-            <Link href="/stock/movimientos">
-              <History className="mr-2 h-4 w-4" />
-              Movimientos
-            </Link>
-          </Button>
-          <Button asChild>
-            <Link href="/stock/ingreso">
-              <PackagePlus className="mr-2 h-4 w-4" />
-              Ingreso de Stock
-            </Link>
-          </Button>
-          <Button asChild variant="outline">
-            <Link href="/stock/egreso">
-              <PackageMinus className="mr-2 h-4 w-4" />
-              Egreso de Stock
-            </Link>
-          </Button>
+          {/* El vendedor consulta el stock pero no lo mueve */}
+          <RoleGate allowedRoles={[Role.ADMIN, Role.DEPOSITO]}>
+            <Button asChild variant="outline">
+              <Link href="/stock/movimientos">
+                <History className="mr-2 h-4 w-4" />
+                Movimientos
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/stock/ingreso">
+                <PackagePlus className="mr-2 h-4 w-4" />
+                Ingreso de Stock
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link href="/stock/egreso">
+                <PackageMinus className="mr-2 h-4 w-4" />
+                Egreso de Stock
+              </Link>
+            </Button>
+          </RoleGate>
         </div>
       </div>
       <PaginatedTable

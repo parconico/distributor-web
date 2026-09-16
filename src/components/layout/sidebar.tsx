@@ -41,7 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { Role } from "@/types";
+import { puedeVerSeccion } from "@/lib/permisos";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -54,7 +54,6 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
-  allowedRoles: Role[];
 }
 
 const defaultNavItems: NavItem[] = [
@@ -63,98 +62,84 @@ const defaultNavItems: NavItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.DEPOSITO, Role.CONTADOR],
   },
   {
     id: "proveedores",
     label: "Proveedores",
     href: "/proveedores",
     icon: Truck,
-    allowedRoles: [Role.ADMIN, Role.DEPOSITO, Role.CONTADOR],
   },
   {
     id: "compras",
     label: "Compras",
     href: "/compras",
     icon: ShoppingCart,
-    allowedRoles: [Role.ADMIN, Role.DEPOSITO, Role.CONTADOR],
   },
   {
     id: "clientes",
     label: "Clientes",
     href: "/clientes",
     icon: Users,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.CONTADOR],
   },
   {
     id: "productos",
     label: "Productos",
     href: "/productos",
     icon: Package,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.DEPOSITO, Role.CONTADOR],
   },
   {
     id: "precios",
     label: "Precios",
     href: "/precios",
     icon: DollarSign,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.CONTADOR],
   },
   {
     id: "ventas",
     label: "Ventas",
     href: "/ventas",
     icon: ShoppingCart,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.CONTADOR],
   },
   {
     id: "remitos",
     label: "Remitos",
     href: "/remitos",
     icon: ClipboardList,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.DEPOSITO, Role.CONTADOR],
   },
   {
     id: "stock",
     label: "Stock",
     href: "/stock",
     icon: Warehouse,
-    allowedRoles: [Role.ADMIN, Role.DEPOSITO],
   },
   {
     id: "cuentas-corrientes",
     label: "Cuentas Corrientes",
     href: "/cuentas-corrientes",
     icon: BookOpen,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.CONTADOR],
   },
   {
     id: "consultar-contribuyente",
     label: "Consultar ARCA",
     href: "/consultar-contribuyente",
     icon: SearchCheck,
-    allowedRoles: [Role.ADMIN, Role.VENDEDOR, Role.CONTADOR],
   },
   {
     id: "facturacion",
     label: "Facturación",
     href: "/facturacion",
     icon: FileText,
-    allowedRoles: [Role.ADMIN, Role.CONTADOR],
   },
   {
     id: "reportes",
     label: "Reportes",
     href: "/reportes",
     icon: BarChart3,
-    allowedRoles: [Role.ADMIN, Role.CONTADOR],
   },
   {
     id: "usuarios",
     label: "Usuarios",
     href: "/usuarios",
     icon: UserCog,
-    allowedRoles: [Role.ADMIN],
   },
 ];
 
@@ -274,7 +259,7 @@ function SidebarNav({
   }, []);
 
   const filteredItems = orderedItems.filter(
-    (item) => user && item.allowedRoles.includes(user.role)
+    (item) => user && puedeVerSeccion(user.role, item.href)
   );
 
   const sensors = useSensors(

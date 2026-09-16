@@ -54,7 +54,8 @@ export default function LoginPage() {
     setIsSubmitting(true);
     try {
       await login(data.email, data.password);
-      router.push("/dashboard");
+      // La portada decide a donde entra cada rol
+      router.push("/");
     } catch {
       toast({
         variant: "destructive",
