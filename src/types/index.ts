@@ -357,6 +357,12 @@ export interface ArcaConfig {
   id: string;
   cuit: string;
   puntoVenta: number;
+  // Datos del emisor que se imprimen en el remito.
+  razonSocial?: string | null;
+  domicilio?: string | null;
+  condicionIva?: string | null;
+  ingresosBrutos?: string | null;
+  inicioActividades?: string | null;
   environment: string;
 }
 
