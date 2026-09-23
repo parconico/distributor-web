@@ -304,20 +304,20 @@ export default function RemitoDetailPage() {
               </AlertDialogContent>
             </AlertDialog>
           )}
-          {remito.estado !== "BORRADOR" && (
-            <Button
-              variant="outline"
-              onClick={() =>
-                descargarPdf(
-                  `/remitos/${params.id}/pdf`,
-                  `remito-${remito.numero}.pdf`,
-                )
-              }
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Descargar PDF
-            </Button>
-          )}
+          {/* Tambien en borrador: se imprime para entregar antes de confirmar
+              la venta, que es lo que pasa el remito a confirmado. */}
+          <Button
+            variant="outline"
+            onClick={() =>
+              descargarPdf(
+                `/remitos/${params.id}/pdf`,
+                `remito-${remito.numero}.pdf`,
+              )
+            }
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Descargar PDF
+          </Button>
           <Button variant="outline" onClick={() => router.push("/remitos")}>
             Volver
           </Button>
