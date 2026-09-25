@@ -57,7 +57,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { RoleGate } from "@/components/shared/role-gate";
-import { ExternalLink, Loader2, Trash2, Download, Pencil, X, Save } from "lucide-react";
+import { ExternalLink, Loader2, Trash2, Download, Pencil, X, Save, Printer } from "lucide-react";
 import Link from "next/link";
 import { AxiosError } from "axios";
 
@@ -510,6 +510,20 @@ export default function VentaDetailPage() {
                 </AlertDialog>
               </RoleGate>
             </>
+          )}
+          {!isEditing && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                descargarPdf(
+                  `/ventas/${venta.id}/pdf`,
+                  `presupuesto-${venta.numero}.pdf`,
+                )
+              }
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </Button>
           )}
           <Button variant="outline" onClick={() => router.push("/ventas")}>
             Volver
